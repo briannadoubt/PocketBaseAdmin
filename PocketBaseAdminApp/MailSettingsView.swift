@@ -6,76 +6,162 @@
 //
 
 import SwiftUI
+import PocketBase
+import PocketBaseAdmin
 
 struct MailSettingsView: View {
     @State private var senderName = ""
     @State private var senderAddress = ""
-    
+
     @State private var useSMTPMailServer = false
-    
+    @State private var smtpHost = ""
+    @State private var smtpPort = ""
+    @State private var smtpUsername = ""
+    @State private var smtpPassword = ""
+    @State private var smtpAuthMethod = "PLAIN"
+    @State private var smtpTLS = true
+    @State private var smtpLocalName = ""
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var successMessage: String?
+
+    @Environment(\.pocketbase) private var pocketbase
+    @Environment(Admin.Settings.self) private var settings
+
     var body: some View {
         ScrollView {
             Form {
-                Text("Configure common settings for sending emails.")
+                if let errorMessage {
+                    Section {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                if let successMessage {
+                    Section {
+                        Label(successMessage, systemImage: "checkmark.circle")
+                            .foregroundStyle(.green)
+                    }
+                }
+
                 Section {
+                    Text("Configure common settings for sending emails.")
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Sender Info") {
                     TextField("Sender name", text: $senderName)
                     TextField("Sender address", text: $senderAddress)
+                    #if os(iOS)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                    #endif
                 }
+
                 Section {
-                    MailTemplate(title: "Verification")
-                    MailTemplate(title: "Password reset")
-                    MailTemplate(title: "Confirm email change")
+                    Toggle("Use SMTP mail server (recommended)", isOn: $useSMTPMailServer)
                 }
-                Section {
-                    Toggle("Use SMTP mail server **(reccomended)**", isOn: $useSMTPMailServer)
+
+                if useSMTPMailServer {
+                    Section("SMTP Configuration") {
+                        TextField("Host", text: $smtpHost)
+                        #if os(iOS)
+                            .autocapitalization(.none)
+                        #endif
+
+                        TextField("Port", text: $smtpPort)
+                        #if os(iOS)
+                            .keyboardType(.numberPad)
+                        #endif
+
+                        TextField("Username", text: $smtpUsername)
+                        #if os(iOS)
+                            .autocapitalization(.none)
+                        #endif
+
+                        SecureField("Password", text: $smtpPassword)
+
+                        Picker("Auth Method", selection: $smtpAuthMethod) {
+                            Text("PLAIN").tag("PLAIN")
+                            Text("LOGIN").tag("LOGIN")
+                        }
+
+                        Toggle("Use TLS", isOn: $smtpTLS)
+
+                        TextField("Local name (optional)", text: $smtpLocalName)
+                        #if os(iOS)
+                            .autocapitalization(.none)
+                        #endif
+                    }
                 }
             }
+            .safeAreaPadding()
         }
         .navigationTitle("Mail settings")
-        .safeAreaInset(edge: .bottom) {
-            Button("Send test email") {
-                
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    Task {
+                        await saveSettings()
+                    }
+                }
+                .disabled(isSaving)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle)
+        }
+        .task {
+            loadSettings()
         }
     }
-}
 
-struct MailTemplate: View {
-    var title: String
-    
-    @State private var subject: String = ""
-    @State private var actionURL: String = ""
-    @State private var bodyText: String = ""
-    
-    var body: some View {
-        DisclosureGroup {
-            Section {
-                TextField("Subject", text: $subject)
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-            Section {
-                TextField("Action URL", text: $actionURL)
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}, {TOKEN}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-            Section {
-                TextEditor(text: $bodyText)
-                    .monospaced()
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}, {TOKEN}, {ACTION_URL}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-        } label: {
-            Label {
-                Text("Default \"\(title)\" email template")
-            } icon: {
-                Image(.template)
-            }
+    private func loadSettings() {
+        senderName = settings.meta?.senderName ?? ""
+        senderAddress = settings.meta?.senderAddress ?? ""
+
+        if let smtp = settings.smtp {
+            useSMTPMailServer = smtp.enabled ?? false
+            smtpHost = smtp.host ?? ""
+            smtpPort = smtp.port.map { String($0) } ?? ""
+            smtpUsername = smtp.username ?? ""
+            smtpPassword = smtp.password ?? ""
+            smtpAuthMethod = smtp.authMethod ?? "PLAIN"
+            smtpTLS = smtp.tls ?? true
+            smtpLocalName = smtp.localName ?? ""
+        }
+    }
+
+    private func saveSettings() async {
+        isSaving = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isSaving = false }
+
+        // Update meta settings
+        if settings.meta == nil {
+            settings.meta = Meta()
+        }
+        settings.meta?.senderName = senderName.isEmpty ? nil : senderName
+        settings.meta?.senderAddress = senderAddress.isEmpty ? nil : senderAddress
+
+        // Update SMTP settings
+        settings.smtp = SMTPSettings(
+            enabled: useSMTPMailServer,
+            host: smtpHost.isEmpty ? nil : smtpHost,
+            port: Int(smtpPort),
+            username: smtpUsername.isEmpty ? nil : smtpUsername,
+            password: smtpPassword.isEmpty ? nil : smtpPassword,
+            authMethod: smtpAuthMethod,
+            tls: smtpTLS,
+            localName: smtpLocalName.isEmpty ? nil : smtpLocalName
+        )
+
+        do {
+            try await settings.update(pocketbase: pocketbase)
+            successMessage = "Settings saved successfully"
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
