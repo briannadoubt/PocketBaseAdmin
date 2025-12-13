@@ -84,37 +84,44 @@ struct CollectionView: View {
     @State private var isDeleting = false
     @State private var showRecordEditor = false
     @State private var editingRecord: RecordModel? = nil
+    @State private var showCollectionEditor = false
+    @State private var isDeletingCollection = false
 
     private var selectedRecordModel: RecordModel? {
         state.records.first { $0.id == selectedRecords.first }
     }
-    
+
     private var schema: [Field] {
         state.collection.schema ?? []
     }
-    
+
     private var sort: String? {
         let hasCreatedKey = schema.contains(where: { $0.name == "created" })
         return hasCreatedKey ? "-created" : nil
     }
-    
+
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dismiss) private var dismiss
+    @Environment(CollectionsState.self) private var collectionsState
     
     @State private var selectedInpector: InspectorTab?
     
     enum InspectorTab: String, CaseIterable, Identifiable {
         case record
+        case schema
         case api
-        
+
         var id: String { rawValue }
-        
+
         var title: String {
             switch self {
             case .api:
                 "API Preview"
             case .record:
                 "Record Details"
+            case .schema:
+                "Schema"
             }
         }
     }
@@ -197,6 +204,18 @@ struct CollectionView: View {
                         systemImage: "doc"
                     )
                 }
+            case .schema:
+                SchemaInspectorView(
+                    collection: state.collection,
+                    onEdit: {
+                        showCollectionEditor = true
+                    },
+                    onDelete: {
+                        Task {
+                            await deleteCollection()
+                        }
+                    }
+                )
             case .api:
                 ContentUnavailableView(
                     "API Preview Unavailable",
@@ -262,6 +281,14 @@ struct CollectionView: View {
                 }
             )
         }
+        .sheet(isPresented: $showCollectionEditor) {
+            CollectionEditorView(
+                collection: state.collection,
+                onSave: { updatedCollection in
+                    state.collection = updatedCollection
+                }
+            )
+        }
     }
 
     private func deleteSelectedRecords() async {
@@ -286,6 +313,18 @@ struct CollectionView: View {
 
         if !failedDeletions.isEmpty {
             state.logger.warning("Failed to delete \(failedDeletions.count) records")
+        }
+    }
+
+    private func deleteCollection() async {
+        isDeletingCollection = true
+        defer { isDeletingCollection = false }
+
+        do {
+            try await collectionsState.delete(id: state.collection.id, using: pocketbase)
+            dismiss()
+        } catch {
+            state.logger.error("Failed to delete collection: \(error)")
         }
     }
 }
@@ -558,6 +597,268 @@ struct JSONValueView: View {
             Text(string)
         case .int(let int):
             Text(int, format: .number)
+        }
+    }
+}
+
+struct SchemaInspectorView: View {
+    let collection: CollectionModel
+    var onEdit: (() -> Void)?
+    var onDelete: (() -> Void)?
+
+    private var schema: [Field] {
+        collection.schema ?? []
+    }
+
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Schema")
+                        .font(.headline)
+                    Spacer()
+                    if let onEdit, !collection.system {
+                        Button("Edit", systemImage: "pencil") {
+                            onEdit()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    if let _ = onDelete, !collection.system {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            showDeleteConfirmation = true
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .alert("Delete Collection?", isPresented: $showDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        onDelete?()
+                    }
+                } message: {
+                    Text("Are you sure you want to delete \"\(collection.name)\"? This will permanently delete all records in this collection. This action cannot be undone.")
+                }
+
+                // Collection info
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("Type") {
+                        Text(collection.type.rawValue.capitalized)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(collectionTypeColor.opacity(0.2))
+                            )
+                    }
+                    if collection.system {
+                        LabeledContent("System") {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+
+                Divider()
+
+                // Fields section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Fields")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    if schema.isEmpty {
+                        Text("No fields defined")
+                            .foregroundStyle(.secondary)
+                            .italic()
+                    } else {
+                        ForEach(schema, id: \.id) { field in
+                            SchemaFieldRow(field: field)
+                        }
+                    }
+                }
+
+                Divider()
+
+                // Rules section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("API Rules")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    RuleRow(name: "List", rule: collection.listRule)
+                    RuleRow(name: "View", rule: collection.viewRule)
+                    RuleRow(name: "Create", rule: collection.createRule)
+                    RuleRow(name: "Update", rule: collection.updateRule)
+                    RuleRow(name: "Delete", rule: collection.deleteRule)
+                }
+
+                if let indexes = collection.indexes, !indexes.isEmpty {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Indexes")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        ForEach(indexes, id: \.self) { index in
+                            Text(index)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .safeAreaPadding()
+        }
+        #if os(macOS)
+        .frame(maxWidth: 320, maxHeight: .infinity, alignment: .top)
+        #endif
+        .background(Color.gray.opacity(0.07))
+    }
+
+    private var collectionTypeColor: Color {
+        switch collection.type {
+        case .base:
+            return .blue
+        case .auth:
+            return .green
+        case .view:
+            return .purple
+        }
+    }
+}
+
+struct SchemaFieldRow: View {
+    let field: Field
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(field.name)
+                    .fontWeight(.medium)
+                if field.required == true {
+                    Text("*")
+                        .foregroundStyle(.red)
+                }
+                if field.system {
+                    Text("system")
+                        .font(.caption2)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.secondary.opacity(0.2))
+                        )
+                }
+                Spacer()
+                Text(field.type.rawValue)
+                    .font(.caption)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(fieldTypeColor.opacity(0.15))
+                    )
+                    .foregroundStyle(fieldTypeColor)
+            }
+
+            if let options = field.options {
+                FieldOptionsView(options: options, fieldType: field.type)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var fieldTypeColor: Color {
+        switch field.type {
+        case .text, .editor:
+            return .blue
+        case .number:
+            return .orange
+        case .bool:
+            return .green
+        case .email, .customEmail:
+            return .purple
+        case .url:
+            return .cyan
+        case .date, .dateTime, .autodate:
+            return .pink
+        case .select:
+            return .indigo
+        case .file:
+            return .brown
+        case .relation:
+            return .mint
+        case .json:
+            return .gray
+        case .password:
+            return .red
+        }
+    }
+}
+
+struct FieldOptionsView: View {
+    let options: FieldOptions
+    let fieldType: FieldType
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let min = options.min {
+                optionRow("Min", value: "\(min)")
+            }
+            if let max = options.max {
+                optionRow("Max", value: "\(max)")
+            }
+            if let maxSize = options.maxSize {
+                optionRow("Max size", value: ByteCountFormatter.string(fromByteCount: Int64(maxSize), countStyle: .file))
+            }
+            if let values = options.values, !values.isEmpty {
+                optionRow("Values", value: values.joined(separator: ", "))
+            }
+            if let collectionId = options.collectionId {
+                optionRow("Collection", value: collectionId)
+            }
+            if let mimeTypes = options.mimeTypes, !mimeTypes.isEmpty {
+                optionRow("MIME types", value: mimeTypes.joined(separator: ", "))
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func optionRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label + ":")
+            Text(value)
+        }
+    }
+}
+
+struct RuleRow: View {
+    let name: String
+    let rule: String?
+
+    var body: some View {
+        HStack(alignment: .top) {
+            Text(name)
+                .frame(width: 60, alignment: .leading)
+                .foregroundStyle(.secondary)
+
+            if let rule, !rule.isEmpty {
+                Text(rule)
+                    .font(.system(.caption, design: .monospaced))
+            } else if rule == "" {
+                Text("(public)")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            } else {
+                Text("(locked)")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
     }
 }

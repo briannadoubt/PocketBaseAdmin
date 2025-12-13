@@ -16,9 +16,9 @@ import OSLog
 final class CollectionsState {
     var collections: [CollectionState] = []
     var error: String?
-    
+
     var logger = Logger(subsystem: "PocketBaseAdminApp", category: "CollectionsState")
-    
+
     func load(from pocketbase: PocketBase) async {
         do {
             let newCollections = try await pocketbase.admin.collections
@@ -34,6 +34,22 @@ final class CollectionsState {
             logger.error("Error loading collections: \(error)")
             self.error = String(describing: error)
         }
+    }
+
+    func addCollection(_ collection: CollectionModel) {
+        let state = CollectionState(collection: collection)
+        collections.append(state)
+    }
+
+    func updateCollection(_ collection: CollectionModel) {
+        if let index = collections.firstIndex(where: { $0.collection.id == collection.id }) {
+            collections[index].collection = collection
+        }
+    }
+
+    func delete(id: String, using pocketbase: PocketBase) async throws {
+        try await pocketbase.admin.collections.delete(id: id)
+        collections.removeAll { $0.collection.id == id }
     }
 }
 
