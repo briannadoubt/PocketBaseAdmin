@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SDWebImageSwiftUI
+import NukeUI
 import PocketBase
 
 struct RemoteImage<T: Record>: View {
@@ -15,6 +15,6 @@ struct RemoteImage<T: Record>: View {
         self.url = url
     }
     var body: some View {
-        WebImage(url: url)
+        LazyImage(url: url)
     }
 }

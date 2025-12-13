@@ -9,13 +9,16 @@ import SwiftUI
 import PocketBaseAdmin
 import PocketBase
 import OSLog
+import Foundation
 
 @Observable @MainActor
 final class CollectionState: Identifiable {
     var collection: CollectionModel
+    
     init(collection: CollectionModel) {
         self.collection = collection
     }
+    
     var records: [RecordModel] = []
     var page: Int = 1
     
@@ -24,31 +27,44 @@ final class CollectionState: Identifiable {
     var retryCount: Int = 0
     var maxRetryCount: Int = 5
     
-    func load(with pocketbase: PocketBase) async {
+    var searchQuery: String = ""
+    
+    @concurrent
+    func load(with pocketbase: PocketBase, sort: String? = nil) async {
         do {
-            let newRecords = try await Admin(pocketbase: pocketbase)
-                .records(collection.name, page: page)
+            let newRecords = try await pocketbase.admin
+                .records(collection.name)
+                .list(page: page, sort: sort)
                 .items
             await MainActor.run {
                 records = newRecords
+                retryCount = 0
             }
-            retryCount = 0
         } catch {
             let nsError = error as NSError
 
-            if
-                nsError.domain == NSURLErrorDomain,
-                nsError.code == NSURLErrorCancelled
-            {
-                retryCount += 1
-                try? await Task.sleep(for: .seconds(1))
-                if retryCount >= maxRetryCount {
-                    retryCount = 0
-                    logger.error("Failed to load records after \(self.maxRetryCount) retries with error \(error)")
-                    return
+            if nsError.domain == NSURLErrorDomain,
+               nsError.code == NSURLErrorCancelled {
+                await MainActor.run {
+                    retryCount += 1
                 }
-                logger.info("Retring to load records... (Retry count: \(self.retryCount))")
-                await load(with: pocketbase)
+                try? await Task.sleep(for: .seconds(1))
+                await MainActor.run {
+                    if retryCount >= maxRetryCount {
+                        retryCount = 0
+                        logger.error("Failed to load records after \(self.maxRetryCount) retries: \(String(describing: error))")
+                        return
+                    }
+                    logger.info("Retrying to load records... (Attempt \(self.retryCount)/\(self.maxRetryCount))")
+                }
+                if await retryCount != 0 {
+                    await load(with: pocketbase, sort: sort)
+                }
+            } else {
+                await MainActor.run {
+                    logger.error("Failed to load records: \(String(describing: error))")
+                    retryCount = 0
+                }
             }
         }
     }
@@ -57,15 +73,50 @@ final class CollectionState: Identifiable {
 struct CollectionView: View {
     @Bindable var state: CollectionState
     
+    init(
+        state: CollectionState,
+    ) {
+        self.state = state
+    }
+    
+    @State private var selectedRecords: Set<RecordModel.ID> = []
+    
+    private var selectedRecordModel: RecordModel? {
+        state.records.first { $0.id == selectedRecords.first }
+    }
+    
     private var schema: [Field] {
         state.collection.schema ?? []
+    }
+    
+    private var sort: String? {
+        let hasCreatedKey = schema.contains(where: { $0.name == "created" })
+        return hasCreatedKey ? "-created" : nil
     }
     
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
+    @State private var selectedInpector: InspectorTab?
+    
+    enum InspectorTab: String, CaseIterable, Identifiable {
+        case record
+        case api
+        
+        var id: String { rawValue }
+        
+        var title: String {
+            switch self {
+            case .api:
+                "API Preview"
+            case .record:
+                "Record Details"
+            }
+        }
+    }
+    
     var body: some View {
-        Table(state.records) {
+        Table(state.records, selection: $selectedRecords) {
             if horizontalSizeClass == .compact {
                 TableColumn("Compact") { record in
                     CompactRecordRow(
@@ -74,22 +125,107 @@ struct CollectionView: View {
                     )
                 }
             }
-            TableColumnForEach(schema) { field in
+
+            // These are implicitely ignored when rendered with compact horizontal size class
+            TableColumn("id") { record in
+                FieldView(
+                    field: Field(
+                        id: "id",
+                        name: "id",
+                        presentable: false,
+                        system: true,
+                        type: .text
+                    ),
+                    record: record
+                )
+            }
+            
+            TableColumnForEach(schema, id: \.id) { field in
                 TableColumn(field.name) { record in
                     FieldView(field: field, record: record)
                 }
             }
         }
-        .task {
-            Task.detached {
-                print("Loading collection records...")
-                await state.load(with: pocketbase)
-            }
+        .refreshable { [state = state, pocketbase = pocketbase, sort = sort] in
+            await state.load(with: pocketbase, sort: sort)
         }
-        .refreshable {
+        .task { [state = state, pocketbase = pocketbase] in
+            print("Loading collection records...")
             await state.load(with: pocketbase)
         }
         .navigationTitle(state.collection.name)
+        .searchable(text: $state.searchQuery)
+        .inspector(
+            isPresented: Binding(
+                get: { self.selectedInpector != nil },
+                set: { _ in })
+        ) {
+            VStack {
+                Picker(
+                    selection: Binding {
+                        selectedInpector ?? .record
+                    } set: { inspector, _ in
+                        self.selectedInpector = inspector
+                    }
+                ) {
+                    ForEach(InspectorTab.allCases) { tab in
+                        Text(tab.title)
+                    }
+                } label: {
+                    EmptyView()
+                }
+            }
+            switch selectedInpector {
+            case .record:
+                if
+                    let selectedRecordModel,
+                    let record = state.records.first(
+                        where: { $0.id == selectedRecordModel.id }
+                    )
+                {
+                    RecordInspectorView(record: record, schema: schema)
+                } else {
+                    ContentUnavailableView(
+                        "No record selected",
+                        systemImage: "doc"
+                    )
+                }
+            case .api:
+                ContentUnavailableView(
+                    "API Preview Unavailable",
+                    systemImage: "xmark",
+                    description: Text("")
+                )
+            case nil:
+                ContentUnavailableView(
+                    "What the heck are you even doing?? Get a life.",
+                    systemImage: "questionmark"
+                )
+            }
+            
+        }
+        .toolbar {
+#if !os(macOS)
+            ToolbarItem(placement: .status) {
+                if !selectedRecords.isEmpty {
+                    Button("Deselect (\(selectedRecords.count.description))") {
+                        selectedRecords.removeAll()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+#endif // !os(macOS)
+            
+            ToolbarItem(placement: .status) {
+                if !selectedRecords.isEmpty {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        // TODO: Implement delete functionality
+                        print("Delete \(selectedRecords.count) records")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
     }
 }
 
@@ -97,13 +233,9 @@ struct CompactRecordRow: View {
     var schema: [Field]
     var record: RecordModel
 
-    @State private var isSelected = false
-
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack {
-                Toggle("Is Selected", isOn: $isSelected)
-                    .labelsHidden()
                 ForEach(schema, id: \.name) { field in
                     VStack(alignment: .leading) {
                         FieldView(field: field, record: record)
@@ -114,6 +246,81 @@ struct CompactRecordRow: View {
                 }
             }
         }
+    }
+}
+
+struct RecordInspectorView: View {
+    let record: RecordModel?
+    let schema: [Field]
+    var body: some View {
+        Group {
+            if let record = record {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Inspector").font(.headline)
+                        HStack(alignment: .top) {
+                            Text("id").fontWeight(.semibold)
+                            Spacer()
+                            FieldView(
+                                field: Field(
+                                    id: "id",
+                                    name: "id",
+                                    presentable: false,
+                                    system: false,
+                                    type: .text
+                                ),
+                                record: record
+                            )
+                            if case let .bool(verified) = record
+                                .content["verified"] ?? .null, verified {
+                                Image(systemName: verified ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(verified ? .green : .secondary)
+                            }
+                        }
+                        ForEach(schema, id: \.name) { field in
+                            HStack(alignment: .top) {
+                                Text(field.name).fontWeight(.semibold)
+                                Spacer()
+                                FieldView(field: field, record: record)
+                            }
+                        }
+                    }
+                    .safeAreaPadding()
+                }
+            } else {
+                ContentUnavailableView(
+                    "Select a record to inspect",
+                    systemImage: "doc.text.magnifyingglass",
+                    description: Text("Once you select a record, you can inspect its fields here.")
+                )
+            }
+        }
+        #if os(macOS)
+        .frame(maxWidth: 320, maxHeight: .infinity, alignment: .top)
+        #endif
+        .background(Color.gray.opacity(0.07))
+    }
+}
+
+struct MailLink: View {
+    let email: String
+    @Environment(\.openURL) private var open
+    var body: some View {
+        #if os(iOS)
+        Button(email) {
+            if let url = URL(string: "mailto:\(email)") {
+                open(url)
+            }
+        }
+        #elseif os(macOS)
+        Button(email) {
+            if let url = URL(string: "mailto:\(email)") {
+                open(url)
+            }
+        }
+        #else
+        Link(email, destination: URL(string: "mailto:\(email)")!)
+        #endif
     }
 }
 
@@ -142,8 +349,97 @@ struct FieldView: View {
                 } else {
                     JSONValueView(value: fieldValue)
                 }
-            default:
+            case .autodate, .date, .dateTime:
+                if case .date(let date) = fieldValue {
+                    Text(date, format: .dateTime)
+                } else if case .string(let string) = fieldValue, let date = ISO8601DateFormatter().date(from: string) {
+                    Text(date, format: .dateTime)
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .bool:
+                if case .bool(let bool) = fieldValue {
+                    Image(systemName: bool ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(bool ? .green : .secondary)
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .customEmail, .email:
+                if case .string(let email) = fieldValue {
+                    MailLink(email: email)
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .file:
+                if case .string(let string) = fieldValue, let url = URL(string: string) {
+                    Link("File", destination: url)
+                } else if case .array(let array) = fieldValue {
+                    VStack(alignment: .leading) {
+                        ForEach(array.indices, id: \ .self) { idx in
+                            if case .string(let urlString) = array[idx], let url = URL(string: urlString) {
+                                Link("File \(idx + 1)", destination: url)
+                            }
+                        }
+                    }
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .json:
                 JSONValueView(value: fieldValue)
+            case .number:
+                switch fieldValue {
+                case .int(let int):
+                    Text(int, format: .number)
+                case .double(let double):
+                    Text(double, format: .number)
+                case .decimal(let decimal):
+                    Text(decimal, format: .number)
+                default:
+                    JSONValueView(value: fieldValue)
+                }
+            case .relation:
+                JSONValueView(value: fieldValue)
+            case .select:
+                if case .string(let string) = fieldValue {
+                    Text(string)
+                        .padding(5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.accentColor.opacity(0.1))
+                        )
+                } else if case .array(let array) = fieldValue {
+                    HStack { ForEach(array, id: \ .self) { value in JSONValueView(value: value) } }
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .text, .editor:
+                // Always render as plain text, never a Link, regardless of underlying value type
+                switch fieldValue {
+                case .string(let string):
+                    Text(string)
+                case .url(let url):
+                    Text(url.absoluteString)
+                case .int(let int):
+                    Text(int, format: .number)
+                case .double(let double):
+                    Text(double, format: .number)
+                case .decimal(let decimal):
+                    Text(decimal, format: .number)
+                case .bool(let bool):
+                    Text(bool.description)
+                case .date(let date):
+                    Text(date, format: .dateTime)
+                default:
+                    JSONValueView(value: fieldValue)
+                }
+            case .url:
+                if case .string(let string) = fieldValue, let url = URL(string: string) {
+                    Link(string, destination: url)
+                } else if case .url(let url) = fieldValue {
+                    Link(url.absoluteString, destination: url)
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
             }
         }
     }
@@ -160,7 +456,7 @@ struct JSONValueView: View {
                 }
             }
         case .bool(let bool):
-            Text("\(bool)")
+            Text(bool.description)
         case .date(let date):
             Text(date, format: .dateTime)
         case .decimal(let decimal):
@@ -169,6 +465,7 @@ struct JSONValueView: View {
             Link(destination: url) {
                 Text(url.absoluteString)
             }
+            .buttonStyle(.plain)
         case .dictionary(let dictionary):
             VStack {
                 ForEach(Array(dictionary.keys).sorted(), id: \.self) { key in
@@ -218,4 +515,4 @@ extension EnvironmentValues {
         set { self[VerticalSizeClassEnvironmentKey.self] = newValue }
     }
 }
-#endif
+#endif // os(macOS)

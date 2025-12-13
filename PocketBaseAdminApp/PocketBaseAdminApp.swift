@@ -9,10 +9,11 @@ import SwiftUI
 import PocketBaseUI
 import PocketBase
 import PocketBaseAdmin
-import SDWebImageSwiftUI
 
 @main
 struct PocketBaseAdminApp: App {
+    @Environment(\.dismissWindow) private var dismissWindow
+
     let createUser: CreateUser<Superuser> = { username, email in
         Superuser(
             username: username,
@@ -23,16 +24,31 @@ struct PocketBaseAdminApp: App {
     }
     
     var body: some Scene {
-        WindowGroup("PocketBase Admin") {
+        WindowGroup("PocketBase Admin", id: "main") {
             ContentView()
                 .authenticated(newUser: createUser)
-//                .pocketbase(.localhost)
+#if targetEnvironment(simulator) || os(macOS)
+                .pocketbase(.localhost)
+#elseif DEBUG
                 .pocketbase(.localNetwork(ip: "10.0.0.185"))
+#else
+                .pocketbase(url: URL(string: "https://api.pocketbase.app")!)
+#endif
+        }
+        .commands {
+            InspectorCommands()
+            SidebarCommands()
+            ToolbarCommands()
+            TextEditingCommands()
+            TextFormattingCommands()
         }
         
         #if os(macOS) || os(visionOS)
         WindowGroup("Authentication", id: "auth") {
             AuthenticationContentView(createUser: createUser)
+                .onAppear {
+                    dismissWindow(id: "main")
+                }
         }
         .pocketbase(.localhost)
         .windowIdealSize(.fitToContent)
@@ -41,7 +57,9 @@ struct PocketBaseAdminApp: App {
 }
 
 struct AuthenticationContentView: View {
+    #if os(macOS) || os(visionOS)
     @Environment(\.dismissWindow) private var dismissWindow
+    #endif
     @Environment(\.pocketbase) private var pocketbase
     
     @State private var authState: AuthState = .signedOut
@@ -58,10 +76,12 @@ struct AuthenticationContentView: View {
             } description: {
                 Text("You can close this window and return to the app.")
             } actions: {
+                #if os(macOS) || os(visionOS)
                 Button("Let's go!") {
                     dismissWindow(id: "auth")
                 }
                 .buttonStyle(.borderedProminent)
+                #endif
             }
         case .signedOut:
             SignedOutView(

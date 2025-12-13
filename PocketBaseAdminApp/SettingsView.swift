@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import PocketBase
+import PocketBaseAdmin
 
 enum SettingsScreen: String {
     case application
@@ -129,174 +131,15 @@ struct SettingsView: View {
     }
 }
 
-struct ApplicationSettingsView: View {
-    @State private var applicationName: String = ""
-    @State private var applicationURL: String = ""
-    @State private var hideCollectionCreateAndEditControls = false
-    var body: some View {
-        ScrollView {
-            Form {
-                Section {
-                    TextField("Application name", text: $applicationName)
-                    TextField("Application URL", text: $applicationURL)
-                }
-                Section {
-                    Toggle("Hide collection create and edit controls", isOn: $hideCollectionCreateAndEditControls)
-                }
-            }
-        }
-        .navigationTitle("Application")
-        .safeAreaInset(edge: .bottom) {
-            Button("Save changes") {
-                
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle)
-        }
+@propertyWrapper
+public struct EnvironmentBound<T: Observable & AnyObject>: DynamicProperty {
+    @Environment(T.self) private var environmentObject
+    public init(_ type: T.Type = T.self) {}
+    public var wrappedValue: T {
+        environmentObject
     }
-}
-
-struct MailSettingsView: View {
-    @State private var senderName = ""
-    @State private var senderAddress = ""
-    
-    @State private var useSMTPMailServer = false
-    
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Configure common settings for sending emails.")
-                Section {
-                    TextField("Sender name", text: $senderName)
-                    TextField("Sender address", text: $senderAddress)
-                }
-                Section {
-                    MailTemplate(title: "Verification")
-                    MailTemplate(title: "Password reset")
-                    MailTemplate(title: "Confirm email change")
-                }
-                Section {
-                    Toggle("Use SMTP mail server **(reccomended)**", isOn: $useSMTPMailServer)
-                }
-            }
-        }
-        .navigationTitle("Mail settings")
-        .safeAreaInset(edge: .bottom) {
-            Button("Send test email") {
-                
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle)
-        }
-    }
-}
-
-struct MailTemplate: View {
-    var title: LocalizedStringKey
-    
-    @State private var subject: String = ""
-    @State private var actionURL: String = ""
-    @State private var bodyText: String = ""
-    
-    var body: some View {
-        DisclosureGroup {
-            Section {
-                TextField("Subject", text: $subject)
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-            Section {
-                TextField("Action URL", text: $actionURL)
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}, {TOKEN}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-            Section {
-                TextEditor(text: $bodyText)
-                    .monospaced()
-            } footer: {
-                Text("Available placeholder parameters: {APP_NAME}, {APP_URL}, {TOKEN}, {ACTION_URL}.")
-                // TODO: Make variables clickable / add them to the keyboard suggestions somehow.
-            }
-        } label: {
-            Label {
-                Text("Default \"\(title)\" email template")
-            } icon: {
-                Image(.template)
-            }
-        }
-    }
-}
-
-struct FilesSettingsView: View {
-    @State private var useS3Storage = false
-    
-    @State private var endpoint = ""
-    @State private var bucket = ""
-    @State private var region = ""
-    @State private var accessKey = ""
-    @State private var secret = ""
-    
-    @State private var forcePathStyleAddressing = false
-    
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("By default PocketBase uses the local file system to store uploaded files.")
-                    .listRowSeparator(.hidden)
-                Text("If you have limited disk space, you could optionally connect to an S3 compatible storage.")
-                    .listRowSeparator(.hidden)
-                Section {
-                    Toggle("Use S3 storage", isOn: $useS3Storage)
-                }
-                if useS3Storage {
-                    Section {
-                        HStack {
-                            Text("If you have existing uploaded files, you'll have to migrate them manually from the local file system to the S3 storage.")
-                            Text("There are numerous command line tools that can help you, such as: [rclone](https://github.com/rclone/rclone), [s5cmd](https://github.com/peak/s5cmd), etc.")
-                        }
-                        .listRowBackground(Color.orange)
-                    }
-                    Section {
-                        TextField("Endpoint", text: $endpoint)
-                        TextField("Bucket", text: $bucket)
-                        TextField("Region", text: $region)
-                        TextField("Access key", text: $accessKey)
-                        TextField("Secret", text: $secret)
-                    }
-                    Section {
-                        Toggle(isOn: $forcePathStyleAddressing) {
-                            Text("Force path-style addressing")
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Files storage")
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button("Reset") {
-                    
-                }
-                Button("Save") {
-                    
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle)
-            }
-        }
-    }
-}
-
-struct BackupsView: View {
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Backups")
-            }
-        }
-        .navigationTitle("Backups")
+    public var projectedValue: Bindable<T> {
+        Bindable(environmentObject)
     }
 }
 
@@ -308,49 +151,5 @@ struct ExportCollectionsView: View {
             }
         }
         .navigationTitle("Export collections")
-    }
-}
-
-struct ImportCollectionsView: View {
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Import collections")
-            }
-        }
-        .navigationTitle("Import collections")
-    }
-}
-
-struct AuthProvidersView: View {
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Auth providers")
-            }
-        }
-        .navigationTitle("Auth providers")
-    }
-}
-
-struct TokenOptionsView: View {
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Token options")
-            }
-        }
-        .navigationTitle("Token options")
-    }
-}
-
-struct AdminsView: View {
-    var body: some View {
-        ScrollView {
-            Form {
-                Text("Admins")
-            }
-        }
-        .navigationTitle("Admins")
     }
 }

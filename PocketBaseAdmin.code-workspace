@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../PocketBase"
+		},
+		{
+			"path": "../BetterTable"
+		}
+	],
+	"settings": {}
+}

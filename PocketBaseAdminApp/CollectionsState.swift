@@ -21,8 +21,8 @@ final class CollectionsState {
     
     func load(from pocketbase: PocketBase) async {
         do {
-            let newCollections = try await Admin(pocketbase: pocketbase)
-                .collections()
+            let newCollections = try await pocketbase.admin.collections
+                .list()
                 .items
                 .map {
                     CollectionState(collection: $0)
@@ -32,12 +32,12 @@ final class CollectionsState {
             }
         } catch {
             logger.error("Error loading collections: \(error)")
-            self.error = error.localizedDescription
+            self.error = String(describing: error)
         }
     }
 }
 
-extension OrderedDictionary: @retroactive RandomAccessCollection {
+extension OrderedDictionary: @retroactive @MainActor RandomAccessCollection {
     public subscript(position: Int) -> (key: Key, value: Value) {
         (elements.keys[position], values[position])
     }

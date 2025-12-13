@@ -22,8 +22,22 @@ extension CollectionModelType {
     }
 }
 
+extension EnvironmentValues {
+#if canImport(UIKit)
+    @Entry var device: UIDevice = .current
+#endif
+}
+
+struct NavigationGroup: View {
+    
+    var body: some View {
+        
+    }
+}
+
 struct ContentView: View {
     @State private var collectionsState = CollectionsState()
+    @State private var settings = Admin.Settings()
     
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -31,7 +45,7 @@ struct ContentView: View {
     @AppStorage("io.pocketbase.admin.tabCustomization") var tabCustomization = TabViewCustomization()
     
     @State private var selectedTab: String?
-    
+
     var body: some View {
         TabView(selection: $selectedTab) {
             if horizontalSizeClass == .compact {
@@ -42,9 +56,9 @@ struct ContentView: View {
                 } label: {
                     AdminTab.collections.label
                 }
-                #if !os(macOS)
+#if !os(macOS)
                 .customizationBehavior(.disabled, for: .tabBar, .sidebar)
-                #endif
+#endif
             } else {
                 TabSection {
                     ForEach(collectionsState.collections) { state in
@@ -72,16 +86,18 @@ struct ContentView: View {
                 #endif
             }
             
-            Tab(value: AdminTab.logs.rawValue) {
-                NavigationStack {
-                    LogsView()
+            TabSection("Telemetry") {
+                Tab(value: AdminTab.logs.rawValue) {
+                    NavigationStack {
+                        LogsView()
+                    }
+                } label: {
+                    AdminTab.logs.label
                 }
-            } label: {
-                AdminTab.logs.label
+                #if !os(macOS)
+                .customizationBehavior(.disabled, for: .tabBar, .sidebar)
+                #endif
             }
-            #if !os(macOS)
-            .customizationBehavior(.disabled, for: .tabBar, .sidebar)
-            #endif
             
             if horizontalSizeClass == .compact {
                 Tab(value: AdminTab.settings.rawValue) {
@@ -95,6 +111,7 @@ struct ContentView: View {
                 .customizationBehavior(.disabled, for: .tabBar, .sidebar)
                 #endif
             } else {
+                
                 TabSection("System") {
                     Tab(value: SettingsScreen.application.rawValue) {
                         NavigationStack {
@@ -191,7 +208,16 @@ struct ContentView: View {
         .task {
             await collectionsState.load(from: pocketbase)
         }
+        .task {
+            do {
+                try await settings.load(pocketbase: pocketbase)
+            } catch {
+                print("⚠️ Failed to load settings: \(String(describing: error))")
+                // Show a non-blocking error notification
+            }
+        }
         .environment(collectionsState)
+        .environment(settings)
     }
 }
 

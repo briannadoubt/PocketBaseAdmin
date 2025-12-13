@@ -1,0 +1,17 @@
+{
+  "servers": [
+    {
+      "label": "SweetPad",
+      "type": "stdio",
+      "command": "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)",
+      "args": [
+        "/Users/bri/dev/sweetpad/out/mcp/server.js"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "SWEETPAD_WORKSPACE_ROOT": "${workspaceFolder}"
+      },
+      "version": "0.1.68"
+    }
+  ]
+}
