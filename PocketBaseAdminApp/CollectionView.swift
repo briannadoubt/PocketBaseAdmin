@@ -80,7 +80,11 @@ struct CollectionView: View {
     }
     
     @State private var selectedRecords: Set<RecordModel.ID> = []
-    
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var showRecordEditor = false
+    @State private var editingRecord: RecordModel? = nil
+
     private var selectedRecordModel: RecordModel? {
         state.records.first { $0.id == selectedRecords.first }
     }
@@ -183,7 +187,10 @@ struct CollectionView: View {
                         where: { $0.id == selectedRecordModel.id }
                     )
                 {
-                    RecordInspectorView(record: record, schema: schema)
+                    RecordInspectorView(record: record, schema: schema) { recordToEdit in
+                        editingRecord = recordToEdit
+                        showRecordEditor = true
+                    }
                 } else {
                     ContentUnavailableView(
                         "No record selected",
@@ -219,12 +226,66 @@ struct CollectionView: View {
             ToolbarItem(placement: .status) {
                 if !selectedRecords.isEmpty {
                     Button("Delete", systemImage: "trash", role: .destructive) {
-                        // TODO: Implement delete functionality
-                        print("Delete \(selectedRecords.count) records")
+                        showDeleteConfirmation = true
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(isDeleting)
                 }
             }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button("New Record", systemImage: "plus") {
+                    editingRecord = nil
+                    showRecordEditor = true
+                }
+            }
+        }
+        .alert(
+            "Delete \(selectedRecords.count) Record\(selectedRecords.count == 1 ? "" : "s")?",
+            isPresented: $showDeleteConfirmation
+        ) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteSelectedRecords()
+                }
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .sheet(isPresented: $showRecordEditor) {
+            RecordEditorView(
+                collection: state.collection,
+                record: editingRecord,
+                onSave: { [state = state, pocketbase = pocketbase, sort = sort] in
+                    await state.load(with: pocketbase, sort: sort)
+                }
+            )
+        }
+    }
+
+    private func deleteSelectedRecords() async {
+        isDeleting = true
+        defer { isDeleting = false }
+
+        let recordsToDelete = selectedRecords
+        var failedDeletions: [String] = []
+
+        for recordId in recordsToDelete {
+            do {
+                try await pocketbase.admin.records(state.collection.name).delete(id: recordId)
+            } catch {
+                failedDeletions.append(recordId)
+                state.logger.error("Failed to delete record \(recordId): \(error)")
+            }
+        }
+
+        // Clear selection and refresh
+        selectedRecords.removeAll()
+        await state.load(with: pocketbase, sort: sort)
+
+        if !failedDeletions.isEmpty {
+            state.logger.warning("Failed to delete \(failedDeletions.count) records")
         }
     }
 }
@@ -252,12 +313,23 @@ struct CompactRecordRow: View {
 struct RecordInspectorView: View {
     let record: RecordModel?
     let schema: [Field]
+    var onEdit: ((RecordModel) -> Void)?
+
     var body: some View {
         Group {
             if let record = record {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Inspector").font(.headline)
+                        HStack {
+                            Text("Inspector").font(.headline)
+                            Spacer()
+                            if let onEdit {
+                                Button("Edit", systemImage: "pencil") {
+                                    onEdit(record)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
                         HStack(alignment: .top) {
                             Text("id").fontWeight(.semibold)
                             Spacer()
