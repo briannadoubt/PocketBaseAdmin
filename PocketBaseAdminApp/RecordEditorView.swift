@@ -8,6 +8,7 @@
 import SwiftUI
 import PocketBase
 import PocketBaseAdmin
+import UniformTypeIdentifiers
 
 struct RecordEditorView: View {
     let collection: CollectionModel
@@ -45,7 +46,8 @@ struct RecordEditorView: View {
                     Section {
                         FieldEditorRow(
                             field: field,
-                            value: binding(for: field.name)
+                            value: binding(for: field.name),
+                            pocketbase: pocketbase
                         )
                     } header: {
                         HStack {
@@ -182,6 +184,13 @@ struct RecordEditorView: View {
 struct FieldEditorRow: View {
     let field: Field
     @Binding var value: JSONValue
+    var pocketbase: PocketBase?
+
+    @State private var showFilePicker = false
+    @State private var selectedFileURL: URL?
+    @State private var selectedFileName: String?
+
+    @State private var showRelationPicker = false
 
     var body: some View {
         switch field.type {
@@ -240,19 +249,89 @@ struct FieldEditorRow: View {
                 .frame(minHeight: 100)
                 .font(.system(.body, design: .monospaced))
         case .file:
-            // File upload - placeholder for now
-            Text("File upload not yet supported")
-                .foregroundStyle(.secondary)
+            FileFieldEditor(
+                field: field,
+                value: $value,
+                showFilePicker: $showFilePicker,
+                selectedFileName: $selectedFileName
+            )
+            .fileImporter(
+                isPresented: $showFilePicker,
+                allowedContentTypes: allowedFileTypes,
+                allowsMultipleSelection: field.options?.maxSelect ?? 1 > 1
+            ) { result in
+                handleFileSelection(result)
+            }
         case .relation:
-            // Relation picker - placeholder for now
-            TextField("Record ID", text: stringBinding)
-                .help("Enter the related record ID")
+            RelationFieldEditor(
+                field: field,
+                value: $value,
+                showRelationPicker: $showRelationPicker,
+                pocketbase: pocketbase
+            )
+            .sheet(isPresented: $showRelationPicker) {
+                if let collectionId = field.options?.collectionId, let pocketbase {
+                    RelationPickerSheet(
+                        collectionId: collectionId,
+                        maxSelect: field.options?.maxSelect ?? 1,
+                        selectedIds: relationIdsBinding,
+                        pocketbase: pocketbase
+                    )
+                }
+            }
         case .customEmail:
             TextField(field.name, text: stringBinding)
             #if os(iOS)
                 .keyboardType(.emailAddress)
             #endif
         }
+    }
+
+    private var allowedFileTypes: [UTType] {
+        guard let mimeTypes = field.options?.mimeTypes, !mimeTypes.isEmpty else {
+            return [.data]
+        }
+        return mimeTypes.compactMap { mimeType in
+            UTType(mimeType: mimeType)
+        }
+    }
+
+    private func handleFileSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            if let url = urls.first {
+                selectedFileURL = url
+                selectedFileName = url.lastPathComponent
+                value = .string(url.lastPathComponent)
+            }
+        case .failure:
+            break
+        }
+    }
+
+    private var relationIdsBinding: Binding<[String]> {
+        Binding(
+            get: {
+                switch value {
+                case .string(let s) where !s.isEmpty:
+                    return [s]
+                case .array(let arr):
+                    return arr.compactMap { item in
+                        if case .string(let s) = item { return s }
+                        return nil
+                    }
+                default:
+                    return []
+                }
+            },
+            set: { newIds in
+                if field.options?.maxSelect == 1 {
+                    value = newIds.first.map { .string($0) } ?? .null
+                } else {
+                    value = .array(newIds.map { .string($0) })
+                }
+            }
+        )
     }
 
     // MARK: - Bindings
@@ -331,5 +410,326 @@ struct FieldEditorRow: View {
                 }
             }
         )
+    }
+}
+
+// MARK: - File Field Editor
+
+struct FileFieldEditor: View {
+    let field: Field
+    @Binding var value: JSONValue
+    @Binding var showFilePicker: Bool
+    @Binding var selectedFileName: String?
+
+    private var currentFileName: String? {
+        switch value {
+        case .string(let s) where !s.isEmpty:
+            return s
+        case .array(let arr):
+            return arr.compactMap { item -> String? in
+                if case .string(let s) = item { return s }
+                return nil
+            }.first
+        default:
+            return nil
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let fileName = selectedFileName ?? currentFileName {
+                HStack {
+                    Image(systemName: "doc.fill")
+                        .foregroundStyle(.blue)
+                    Text(fileName)
+                        .lineLimit(1)
+                    Spacer()
+                    Button(role: .destructive) {
+                        value = .null
+                        selectedFileName = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+            }
+
+            Button {
+                showFilePicker = true
+            } label: {
+                Label("Choose File", systemImage: "folder")
+            }
+            .buttonStyle(.bordered)
+
+            if let maxSize = field.options?.maxSize {
+                Text("Max size: \(ByteCountFormatter.string(fromByteCount: Int64(maxSize), countStyle: .file))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let mimeTypes = field.options?.mimeTypes, !mimeTypes.isEmpty {
+                Text("Allowed: \(mimeTypes.joined(separator: ", "))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Relation Field Editor
+
+struct RelationFieldEditor: View {
+    let field: Field
+    @Binding var value: JSONValue
+    @Binding var showRelationPicker: Bool
+    var pocketbase: PocketBase?
+
+    private var selectedIds: [String] {
+        switch value {
+        case .string(let s) where !s.isEmpty:
+            return [s]
+        case .array(let arr):
+            return arr.compactMap { item in
+                if case .string(let s) = item { return s }
+                return nil
+            }
+        default:
+            return []
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !selectedIds.isEmpty {
+                ForEach(selectedIds, id: \.self) { id in
+                    HStack {
+                        Image(systemName: "link")
+                            .foregroundStyle(.blue)
+                        Text(id)
+                            .font(.system(.body, design: .monospaced))
+                            .lineLimit(1)
+                        Spacer()
+                        Button(role: .destructive) {
+                            removeRelation(id)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                }
+            }
+
+            if pocketbase != nil && field.options?.collectionId != nil {
+                Button {
+                    showRelationPicker = true
+                } label: {
+                    Label("Select Record", systemImage: "magnifyingglass")
+                }
+                .buttonStyle(.bordered)
+            } else {
+                TextField("Record ID", text: manualIdBinding)
+                    .font(.system(.body, design: .monospaced))
+            }
+
+            if let collectionId = field.options?.collectionId {
+                Text("Related to: \(collectionId)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var manualIdBinding: Binding<String> {
+        Binding(
+            get: { selectedIds.first ?? "" },
+            set: { newValue in
+                if newValue.isEmpty {
+                    value = .null
+                } else {
+                    value = .string(newValue)
+                }
+            }
+        )
+    }
+
+    private func removeRelation(_ id: String) {
+        var ids = selectedIds
+        ids.removeAll { $0 == id }
+
+        if ids.isEmpty {
+            value = .null
+        } else if field.options?.maxSelect == 1 {
+            value = ids.first.map { .string($0) } ?? .null
+        } else {
+            value = .array(ids.map { .string($0) })
+        }
+    }
+}
+
+// MARK: - Relation Picker Sheet
+
+struct RelationPickerSheet: View {
+    let collectionId: String
+    let maxSelect: Int
+    @Binding var selectedIds: [String]
+    let pocketbase: PocketBase
+
+    @State private var records: [RecordModel] = []
+    @State private var isLoading = false
+    @State private var searchText = ""
+    @State private var errorMessage: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var filteredRecords: [RecordModel] {
+        if searchText.isEmpty {
+            return records
+        }
+        return records.filter { record in
+            record.id.localizedCaseInsensitiveContains(searchText) ||
+            record.content.values.contains { value in
+                if case .string(let s) = value {
+                    return s.localizedCaseInsensitiveContains(searchText)
+                }
+                return false
+            }
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let errorMessage {
+                    ContentUnavailableView {
+                        Label("Error", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(errorMessage)
+                    } actions: {
+                        Button("Retry") {
+                            Task {
+                                await loadRecords()
+                            }
+                        }
+                    }
+                } else if records.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Records", systemImage: "tray")
+                    } description: {
+                        Text("This collection has no records.")
+                    }
+                } else {
+                    List(filteredRecords) { record in
+                        RecordSelectionRow(
+                            record: record,
+                            isSelected: selectedIds.contains(record.id),
+                            onToggle: {
+                                toggleSelection(record.id)
+                            }
+                        )
+                    }
+                    .searchable(text: $searchText, prompt: "Search records")
+                }
+            }
+            .navigationTitle("Select Record")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .task {
+            await loadRecords()
+        }
+    }
+
+    private func loadRecords() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let response = try await pocketbase.admin.records(collectionId).list(perPage: 100)
+            records = response.items
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func toggleSelection(_ id: String) {
+        if selectedIds.contains(id) {
+            selectedIds.removeAll { $0 == id }
+        } else {
+            if maxSelect == 1 {
+                selectedIds = [id]
+            } else if selectedIds.count < maxSelect {
+                selectedIds.append(id)
+            }
+        }
+    }
+}
+
+struct RecordSelectionRow: View {
+    let record: RecordModel
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(record.id)
+                        .font(.system(.body, design: .monospaced))
+
+                    if let displayValue = primaryDisplayValue {
+                        Text(displayValue)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var primaryDisplayValue: String? {
+        // Try common field names for display
+        for key in ["name", "title", "email", "username", "label"] {
+            if case .string(let s) = record.content[key], !s.isEmpty {
+                return s
+            }
+        }
+        return nil
     }
 }

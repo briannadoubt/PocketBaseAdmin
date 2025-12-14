@@ -19,12 +19,13 @@ enum SettingsScreen: String {
     case mail
     case files
     case backups
+    case health
     case exportCollections
     case importCollections
     case authProviders
     case tokenOptions
     case admins
-    
+
     var title: LocalizedStringKey {
         switch self {
         case .application:
@@ -35,6 +36,8 @@ enum SettingsScreen: String {
             "Files storage"
         case .backups:
             "Backups"
+        case .health:
+            "Health"
         case .exportCollections:
             "Export collections"
         case .importCollections:
@@ -47,7 +50,7 @@ enum SettingsScreen: String {
             "Admins"
         }
     }
-    
+
     var systemImage: String {
         switch self {
         case .application:
@@ -58,6 +61,8 @@ enum SettingsScreen: String {
             "tray.2"
         case .backups:
             "archivebox"
+        case .health:
+            "heart.text.square"
         case .exportCollections:
             "externaldrive.badge.icloud"
         case .importCollections:
@@ -100,6 +105,11 @@ struct SettingsView: View {
                     BackupsView()
                 } label: {
                     SettingsScreen.backups.label
+                }
+                NavigationLink {
+                    HealthDashboardView()
+                } label: {
+                    SettingsScreen.health.label
                 }
             }
             Section("Sync") {
