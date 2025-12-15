@@ -152,13 +152,15 @@ struct RecordEditorView: View {
                 return .string(values[0])
             }
             return .string("")
-        case .json:
+        case .json, .geoPoint:
             return .dictionary([:])
         case .date, .dateTime, .autodate:
             return .date(Date())
         case .file, .relation:
             return .null
         case .customEmail:
+            return .string("")
+        case .primaryKey, .unknown:
             return .string("")
         }
     }
@@ -292,6 +294,16 @@ struct FieldEditorRow: View {
             #if os(iOS)
                 .keyboardType(.emailAddress)
             #endif
+        case .primaryKey:
+            TextField(field.name, text: stringBinding)
+                .font(.system(.body, design: .monospaced))
+                .disabled(true)
+        case .geoPoint:
+            TextEditor(text: jsonStringBinding)
+                .frame(minHeight: 60)
+                .font(.system(.body, design: .monospaced))
+        case .unknown:
+            TextField(field.name, text: stringBinding)
         }
     }
 

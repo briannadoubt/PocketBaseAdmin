@@ -642,6 +642,15 @@ struct FieldView: View {
                 } else {
                     JSONValueView(value: fieldValue)
                 }
+            case .primaryKey:
+                if case .string(let string) = fieldValue {
+                    Text(string)
+                        .font(.system(.body, design: .monospaced))
+                } else {
+                    JSONValueView(value: fieldValue)
+                }
+            case .geoPoint, .unknown:
+                JSONValueView(value: fieldValue)
             }
         }
     }
@@ -1307,9 +1316,11 @@ struct SwiftAPIPreviewView: View {
             return "FileValue?"
         case .relation:
             return "[RelatedRecord]?"
-        case .json:
+        case .json, .geoPoint:
             return "[String: Any]?"
         case .password, .customEmail:
+            return "String?"
+        case .primaryKey, .unknown:
             return "String?"
         }
     }
@@ -1335,9 +1346,9 @@ struct SwiftAPIPreviewView: View {
             return "false"
         case .date, .dateTime, .autodate:
             return "Date()"
-        case .file, .relation, .json:
+        case .file, .relation, .json, .geoPoint:
             return "nil"
-        case .password, .customEmail:
+        case .password, .customEmail, .primaryKey, .unknown:
             return "nil"
         }
     }
@@ -1736,6 +1747,12 @@ struct SchemaFieldRow: View {
             return .gray
         case .password:
             return .red
+        case .primaryKey:
+            return .yellow
+        case .geoPoint:
+            return .teal
+        case .unknown:
+            return .secondary
         }
     }
 }

@@ -99,7 +99,7 @@ struct FieldEditorView: View {
                         Toggle("Cascade Delete", isOn: $cascadeDelete)
                     }
 
-                case .email, .customEmail, .url, .bool, .date, .dateTime, .autodate, .json:
+                case .email, .customEmail, .url, .bool, .date, .dateTime, .autodate, .json, .primaryKey, .geoPoint, .unknown:
                     EmptyView()
                 }
             }
@@ -212,6 +212,9 @@ extension FieldType: @retroactive CaseIterable {
         case .relation: return "Relation"
         case .password: return "Password"
         case .customEmail: return "Custom Email"
+        case .primaryKey: return "Primary Key"
+        case .geoPoint: return "Geo Point"
+        case .unknown(let value): return value.capitalized
         }
     }
 }
