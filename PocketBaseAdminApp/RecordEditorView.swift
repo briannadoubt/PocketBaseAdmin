@@ -42,6 +42,14 @@ struct RecordEditorView: View {
                     }
                 }
 
+                if editableFields.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Fields", systemImage: "rectangle.dashed")
+                    } description: {
+                        Text("This collection has no editable fields. Add fields to the collection schema first.")
+                    }
+                }
+
                 ForEach(editableFields, id: \.id) { field in
                     Section {
                         FieldEditorRow(
