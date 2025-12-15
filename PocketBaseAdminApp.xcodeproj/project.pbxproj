@@ -9,9 +9,19 @@
 /* Begin PBXBuildFile section */
 		030D576F2E11FF0B000E174B /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = 030D576E2E11FF0B000E174B /* NukeUI */; };
 		03214DE82D881386004F65F1 /* KeyPathIterable in Frameworks */ = {isa = PBXBuildFile; productRef = 03214DE72D881386004F65F1 /* KeyPathIterable */; };
+		035DA1712EEEBAFA003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1702EEEBAFA003225F0 /* PocketBaseIntents */; };
+		035DA1CD2EEF3CA4003225F0 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 035DA1792EEEBBBB003225F0 /* WidgetKit.framework */; };
+		035DA1CE2EEF3CA4003225F0 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 035DA17B2EEEBBBB003225F0 /* SwiftUI.framework */; };
+		035DA1DB2EEF3CA5003225F0 /* PocketBaseWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		035DA1E12EEF3EBC003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E02EEF3EBC003225F0 /* PocketBase */; };
+		035DA1E32EEF3EBC003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */; };
+		035DA1E52EEF3EC1003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */; };
+		035DA20A2EEF6292003225F0 /* PocketBaseWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		035DA2152EEF6320003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2142EEF6320003225F0 /* PocketBase */; };
+		035DA2172EEF6320003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2162EEF6320003225F0 /* PocketBaseAdmin */; };
+		035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2182EEF6326003225F0 /* PocketBaseIntents */; };
 		037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 037F11EE2D90A587009717C8 /* PocketBaseAdmin */; };
 		0386276C2E10C58900E37D56 /* BetterTable in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 0386276B2E10C58900E37D56 /* BetterTable */; };
-		03E6B09E2E165DC700920C8F /* PocketBase Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 03E6B07E2E165DC600920C8F /* PocketBase Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */ = {isa = PBXBuildFile; productRef = 03EAC97C2D92746200E85F29 /* PocketBaseUI */; };
 /* End PBXBuildFile section */
 
@@ -30,37 +40,55 @@
 			remoteGlobalIDString = 03214DB12D87F778004F65F1;
 			remoteInfo = PocketBaseAdmin;
 		};
-		03E6B08B2E165DC700920C8F /* PBXContainerItemProxy */ = {
+		035DA1D92EEF3CA5003225F0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 03214DAA2D87F778004F65F1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 03E6B07D2E165DC600920C8F;
-			remoteInfo = "PocketBase Watch App";
+			remoteGlobalIDString = 035DA1CB2EEF3CA3003225F0;
+			remoteInfo = PocketBaseWidgetsExtension;
 		};
-		03E6B0952E165DC700920C8F /* PBXContainerItemProxy */ = {
+		035DA1F72EEF6292003225F0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 03214DAA2D87F778004F65F1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 03E6B07D2E165DC600920C8F;
-			remoteInfo = "PocketBase Watch App";
+			remoteGlobalIDString = 035DA1E92EEF6290003225F0;
+			remoteInfo = "PocketBaseWatch Watch App";
 		};
-		03E6B09C2E165DC700920C8F /* PBXContainerItemProxy */ = {
+		035DA2012EEF6292003225F0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 03214DAA2D87F778004F65F1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 03E6B07D2E165DC600920C8F;
-			remoteInfo = "PocketBase Watch App";
+			remoteGlobalIDString = 035DA1E92EEF6290003225F0;
+			remoteInfo = "PocketBaseWatch Watch App";
+		};
+		035DA2082EEF6292003225F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 03214DAA2D87F778004F65F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 035DA1E92EEF6290003225F0;
+			remoteInfo = "PocketBaseWatch Watch App";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		035DA18E2EEEBBBD003225F0 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				035DA1DB2EEF3CA5003225F0 /* PocketBaseWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		038627952E11FCAF00E37D56 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				03E6B09E2E165DC700920C8F /* PocketBase Watch App.app in Embed Watch Content */,
+				035DA20A2EEF6292003225F0 /* PocketBaseWatch Watch App.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,14 +99,34 @@
 		03214DB22D87F778004F65F1 /* PocketBaseAdminApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PocketBaseAdminApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		03214DC32D87F77A004F65F1 /* PocketBaseAdminAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PocketBaseAdminAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		03214DCD2D87F77A004F65F1 /* PocketBaseAdminAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PocketBaseAdminAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		035DA1792EEEBBBB003225F0 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
+		035DA17B2EEEBBBB003225F0 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
+		035DA1B22EEEBCD9003225F0 /* WidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WidgetExtension.entitlements; sourceTree = "<group>"; };
+		035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PocketBaseWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PocketBaseWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		035DA1F62EEF6292003225F0 /* PocketBaseWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		035DA2002EEF6292003225F0 /* PocketBaseWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PocketBaseWidgetsExtension.entitlements; sourceTree = "<group>"; };
 		037F11EC2D8FE525009717C8 /* PocketBase */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = PocketBase; path = ../PocketBase; sourceTree = SOURCE_ROOT; };
 		0386276A2E10C54700E37D56 /* BetterTable */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = BetterTable; path = ../BetterTable; sourceTree = SOURCE_ROOT; };
-		03E6B07E2E165DC600920C8F /* PocketBase Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PocketBase Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		03E6B08A2E165DC700920C8F /* PocketBase Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBase Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		03E6B0942E165DC700920C8F /* PocketBase Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBase Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		035DA1DF2EEF3CA5003225F0 /* Exceptions for "PocketBaseWidgets" folder in "PocketBaseWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BackupStatusWidget.swift,
+				CollectionsListWidget.swift,
+				ErrorCountWidget.swift,
+				Info.plist,
+				QuickActionsWidget.swift,
+				RecentLogsWidget.swift,
+				ServerStatusWidget.swift,
+				StatsWidget.swift,
+				WidgetBundle.swift,
+			);
+			target = 035DA1CB2EEF3CA3003225F0 /* PocketBaseWidgetsExtension */;
+		};
 		039420342D9917DE00F7C656 /* Exceptions for "PocketBaseAdminApp" folder in "PocketBaseAdminApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -105,6 +153,29 @@
 		03214DD02D87F77A004F65F1 /* PocketBaseAdminUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PocketBaseAdminUITests;
+			sourceTree = "<group>";
+		};
+		035DA1CF2EEF3CA4003225F0 /* PocketBaseWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				035DA1DF2EEF3CA5003225F0 /* Exceptions for "PocketBaseWidgets" folder in "PocketBaseWidgetsExtension" target */,
+			);
+			path = PocketBaseWidgets;
+			sourceTree = "<group>";
+		};
+		035DA1EB2EEF6290003225F0 /* PocketBaseWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PocketBaseWatch Watch App";
+			sourceTree = "<group>";
+		};
+		035DA1F92EEF6292003225F0 /* PocketBaseWatch Watch AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PocketBaseWatch Watch AppTests";
+			sourceTree = "<group>";
+		};
+		035DA2032EEF6292003225F0 /* PocketBaseWatch Watch AppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PocketBaseWatch Watch AppUITests";
 			sourceTree = "<group>";
 		};
 		03E6B07F2E165DC600920C8F /* PocketBase Watch App */ = {
@@ -134,6 +205,7 @@
 				0386276C2E10C58900E37D56 /* BetterTable in Frameworks */,
 				037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */,
 				03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */,
+				035DA1712EEEBAFA003225F0 /* PocketBaseIntents in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -151,21 +223,36 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B07B2E165DC600920C8F /* Frameworks */ = {
+		035DA1C92EEF3CA3003225F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				035DA1E52EEF3EC1003225F0 /* PocketBaseIntents in Frameworks */,
+				035DA1CE2EEF3CA4003225F0 /* SwiftUI.framework in Frameworks */,
+				035DA1E32EEF3EBC003225F0 /* PocketBaseAdmin in Frameworks */,
+				035DA1CD2EEF3CA4003225F0 /* WidgetKit.framework in Frameworks */,
+				035DA1E12EEF3EBC003225F0 /* PocketBase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		035DA1E72EEF6290003225F0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				035DA2152EEF6320003225F0 /* PocketBase in Frameworks */,
+				035DA2172EEF6320003225F0 /* PocketBaseAdmin in Frameworks */,
+				035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		035DA1F32EEF6292003225F0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B0872E165DC700920C8F /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		03E6B0912E165DC700920C8F /* Frameworks */ = {
+		035DA1FD2EEF6292003225F0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -178,6 +265,8 @@
 		03214DA92D87F778004F65F1 = {
 			isa = PBXGroup;
 			children = (
+				035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */,
+				035DA1B22EEEBCD9003225F0 /* WidgetExtension.entitlements */,
 				03214DB42D87F778004F65F1 /* PocketBaseAdminApp */,
 				037F11EC2D8FE525009717C8 /* PocketBase */,
 				0386276A2E10C54700E37D56 /* BetterTable */,
@@ -186,6 +275,10 @@
 				03E6B07F2E165DC600920C8F /* PocketBase Watch App */,
 				03E6B08D2E165DC700920C8F /* PocketBase Watch AppTests */,
 				03E6B0972E165DC700920C8F /* PocketBase Watch AppUITests */,
+				035DA1CF2EEF3CA4003225F0 /* PocketBaseWidgets */,
+				035DA1EB2EEF6290003225F0 /* PocketBaseWatch Watch App */,
+				035DA1F92EEF6292003225F0 /* PocketBaseWatch Watch AppTests */,
+				035DA2032EEF6292003225F0 /* PocketBaseWatch Watch AppUITests */,
 				037F11ED2D90A587009717C8 /* Frameworks */,
 				03214DB32D87F778004F65F1 /* Products */,
 			);
@@ -197,9 +290,10 @@
 				03214DB22D87F778004F65F1 /* PocketBaseAdminApp.app */,
 				03214DC32D87F77A004F65F1 /* PocketBaseAdminAppTests.xctest */,
 				03214DCD2D87F77A004F65F1 /* PocketBaseAdminAppUITests.xctest */,
-				03E6B07E2E165DC600920C8F /* PocketBase Watch App.app */,
-				03E6B08A2E165DC700920C8F /* PocketBase Watch AppTests.xctest */,
-				03E6B0942E165DC700920C8F /* PocketBase Watch AppUITests.xctest */,
+				035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */,
+				035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */,
+				035DA1F62EEF6292003225F0 /* PocketBaseWatch Watch AppTests.xctest */,
+				035DA2002EEF6292003225F0 /* PocketBaseWatch Watch AppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -207,6 +301,8 @@
 		037F11ED2D90A587009717C8 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				035DA1792EEEBBBB003225F0 /* WidgetKit.framework */,
+				035DA17B2EEEBBBB003225F0 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -222,11 +318,13 @@
 				03214DAF2D87F778004F65F1 /* Frameworks */,
 				03214DB02D87F778004F65F1 /* Resources */,
 				038627952E11FCAF00E37D56 /* Embed Watch Content */,
+				035DA18E2EEEBBBD003225F0 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				03E6B09D2E165DC700920C8F /* PBXTargetDependency */,
+				035DA1DA2EEF3CA5003225F0 /* PBXTargetDependency */,
+				035DA2092EEF6292003225F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				03214DB42D87F778004F65F1 /* PocketBaseAdminApp */,
@@ -238,6 +336,7 @@
 				03EAC97C2D92746200E85F29 /* PocketBaseUI */,
 				0386276B2E10C58900E37D56 /* BetterTable */,
 				030D576E2E11FF0B000E174B /* NukeUI */,
+				035DA1702EEEBAFA003225F0 /* PocketBaseIntents */,
 			);
 			productName = PocketBaseAdmin;
 			productReference = 03214DB22D87F778004F65F1 /* PocketBaseAdminApp.app */;
@@ -289,72 +388,100 @@
 			productReference = 03214DCD2D87F77A004F65F1 /* PocketBaseAdminAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
-		03E6B07D2E165DC600920C8F /* PocketBase Watch App */ = {
+		035DA1CB2EEF3CA3003225F0 /* PocketBaseWidgetsExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 03E6B09F2E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch App" */;
+			buildConfigurationList = 035DA1DC2EEF3CA5003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWidgetsExtension" */;
 			buildPhases = (
-				03E6B07A2E165DC600920C8F /* Sources */,
-				03E6B07B2E165DC600920C8F /* Frameworks */,
-				03E6B07C2E165DC600920C8F /* Resources */,
+				035DA1C82EEF3CA3003225F0 /* Sources */,
+				035DA1C92EEF3CA3003225F0 /* Frameworks */,
+				035DA1CA2EEF3CA3003225F0 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				03E6B07F2E165DC600920C8F /* PocketBase Watch App */,
+				035DA1CF2EEF3CA4003225F0 /* PocketBaseWidgets */,
 			);
-			name = "PocketBase Watch App";
+			name = PocketBaseWidgetsExtension;
 			packageProductDependencies = (
+				035DA1E02EEF3EBC003225F0 /* PocketBase */,
+				035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */,
+				035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */,
 			);
-			productName = "PocketBase Watch App";
-			productReference = 03E6B07E2E165DC600920C8F /* PocketBase Watch App.app */;
+			productName = PocketBaseWidgetsExtension;
+			productReference = 035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 035DA20B2EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch App" */;
+			buildPhases = (
+				035DA1E62EEF6290003225F0 /* Sources */,
+				035DA1E72EEF6290003225F0 /* Frameworks */,
+				035DA1E82EEF6290003225F0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				035DA1EB2EEF6290003225F0 /* PocketBaseWatch Watch App */,
+			);
+			name = "PocketBaseWatch Watch App";
+			packageProductDependencies = (
+				035DA2142EEF6320003225F0 /* PocketBase */,
+				035DA2162EEF6320003225F0 /* PocketBaseAdmin */,
+				035DA2182EEF6326003225F0 /* PocketBaseIntents */,
+			);
+			productName = "PocketBaseWatch Watch App";
+			productReference = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
-		03E6B0892E165DC700920C8F /* PocketBase Watch AppTests */ = {
+		035DA1F52EEF6292003225F0 /* PocketBaseWatch Watch AppTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 03E6B0A22E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch AppTests" */;
+			buildConfigurationList = 035DA20E2EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch AppTests" */;
 			buildPhases = (
-				03E6B0862E165DC700920C8F /* Sources */,
-				03E6B0872E165DC700920C8F /* Frameworks */,
-				03E6B0882E165DC700920C8F /* Resources */,
+				035DA1F22EEF6292003225F0 /* Sources */,
+				035DA1F32EEF6292003225F0 /* Frameworks */,
+				035DA1F42EEF6292003225F0 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				03E6B08C2E165DC700920C8F /* PBXTargetDependency */,
+				035DA1F82EEF6292003225F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				03E6B08D2E165DC700920C8F /* PocketBase Watch AppTests */,
+				035DA1F92EEF6292003225F0 /* PocketBaseWatch Watch AppTests */,
 			);
-			name = "PocketBase Watch AppTests";
+			name = "PocketBaseWatch Watch AppTests";
 			packageProductDependencies = (
 			);
-			productName = "PocketBase Watch AppTests";
-			productReference = 03E6B08A2E165DC700920C8F /* PocketBase Watch AppTests.xctest */;
+			productName = "PocketBaseWatch Watch AppTests";
+			productReference = 035DA1F62EEF6292003225F0 /* PocketBaseWatch Watch AppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		03E6B0932E165DC700920C8F /* PocketBase Watch AppUITests */ = {
+		035DA1FF2EEF6292003225F0 /* PocketBaseWatch Watch AppUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 03E6B0A52E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch AppUITests" */;
+			buildConfigurationList = 035DA2112EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch AppUITests" */;
 			buildPhases = (
-				03E6B0902E165DC700920C8F /* Sources */,
-				03E6B0912E165DC700920C8F /* Frameworks */,
-				03E6B0922E165DC700920C8F /* Resources */,
+				035DA1FC2EEF6292003225F0 /* Sources */,
+				035DA1FD2EEF6292003225F0 /* Frameworks */,
+				035DA1FE2EEF6292003225F0 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				03E6B0962E165DC700920C8F /* PBXTargetDependency */,
+				035DA2022EEF6292003225F0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				03E6B0972E165DC700920C8F /* PocketBase Watch AppUITests */,
+				035DA2032EEF6292003225F0 /* PocketBaseWatch Watch AppUITests */,
 			);
-			name = "PocketBase Watch AppUITests";
+			name = "PocketBaseWatch Watch AppUITests";
 			packageProductDependencies = (
 			);
-			productName = "PocketBase Watch AppUITests";
-			productReference = 03E6B0942E165DC700920C8F /* PocketBase Watch AppUITests.xctest */;
+			productName = "PocketBaseWatch Watch AppUITests";
+			productReference = 035DA2002EEF6292003225F0 /* PocketBaseWatch Watch AppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -364,7 +491,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2600;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					03214DB12D87F778004F65F1 = {
@@ -378,16 +505,19 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = 03214DB12D87F778004F65F1;
 					};
-					03E6B07D2E165DC600920C8F = {
-						CreatedOnToolsVersion = 26.0;
+					035DA1CB2EEF3CA3003225F0 = {
+						CreatedOnToolsVersion = 26.2;
 					};
-					03E6B0892E165DC700920C8F = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 03E6B07D2E165DC600920C8F;
+					035DA1E92EEF6290003225F0 = {
+						CreatedOnToolsVersion = 26.2;
 					};
-					03E6B0932E165DC700920C8F = {
-						CreatedOnToolsVersion = 26.0;
-						TestTargetID = 03E6B07D2E165DC600920C8F;
+					035DA1F52EEF6292003225F0 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 035DA1E92EEF6290003225F0;
+					};
+					035DA1FF2EEF6292003225F0 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 035DA1E92EEF6290003225F0;
 					};
 				};
 			};
@@ -404,6 +534,7 @@
 				03214DE02D880955004F65F1 /* XCRemoteSwiftPackageReference "pocketbase" */,
 				03214DE62D881386004F65F1 /* XCRemoteSwiftPackageReference "KeyPathIterable" */,
 				030D576D2E11FF0B000E174B /* XCRemoteSwiftPackageReference "Nuke" */,
+				035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 03214DB32D87F778004F65F1 /* Products */;
@@ -413,9 +544,10 @@
 				03214DB12D87F778004F65F1 /* PocketBaseAdminApp */,
 				03214DC22D87F77A004F65F1 /* PocketBaseAdminAppTests */,
 				03214DCC2D87F77A004F65F1 /* PocketBaseAdminAppUITests */,
-				03E6B07D2E165DC600920C8F /* PocketBase Watch App */,
-				03E6B0892E165DC700920C8F /* PocketBase Watch AppTests */,
-				03E6B0932E165DC700920C8F /* PocketBase Watch AppUITests */,
+				035DA1CB2EEF3CA3003225F0 /* PocketBaseWidgetsExtension */,
+				035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */,
+				035DA1F52EEF6292003225F0 /* PocketBaseWatch Watch AppTests */,
+				035DA1FF2EEF6292003225F0 /* PocketBaseWatch Watch AppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -442,21 +574,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B07C2E165DC600920C8F /* Resources */ = {
+		035DA1CA2EEF3CA3003225F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B0882E165DC700920C8F /* Resources */ = {
+		035DA1E82EEF6290003225F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B0922E165DC700920C8F /* Resources */ = {
+		035DA1F42EEF6292003225F0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		035DA1FE2EEF6292003225F0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -487,21 +626,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B07A2E165DC600920C8F /* Sources */ = {
+		035DA1C82EEF3CA3003225F0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B0862E165DC700920C8F /* Sources */ = {
+		035DA1E62EEF6290003225F0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		03E6B0902E165DC700920C8F /* Sources */ = {
+		035DA1F22EEF6292003225F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		035DA1FC2EEF6292003225F0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -521,21 +667,25 @@
 			target = 03214DB12D87F778004F65F1 /* PocketBaseAdminApp */;
 			targetProxy = 03214DCE2D87F77A004F65F1 /* PBXContainerItemProxy */;
 		};
-		03E6B08C2E165DC700920C8F /* PBXTargetDependency */ = {
+		035DA1DA2EEF3CA5003225F0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 03E6B07D2E165DC600920C8F /* PocketBase Watch App */;
-			targetProxy = 03E6B08B2E165DC700920C8F /* PBXContainerItemProxy */;
+			target = 035DA1CB2EEF3CA3003225F0 /* PocketBaseWidgetsExtension */;
+			targetProxy = 035DA1D92EEF3CA5003225F0 /* PBXContainerItemProxy */;
 		};
-		03E6B0962E165DC700920C8F /* PBXTargetDependency */ = {
+		035DA1F82EEF6292003225F0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 03E6B07D2E165DC600920C8F /* PocketBase Watch App */;
-			targetProxy = 03E6B0952E165DC700920C8F /* PBXContainerItemProxy */;
+			target = 035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */;
+			targetProxy = 035DA1F72EEF6292003225F0 /* PBXContainerItemProxy */;
 		};
-		03E6B09D2E165DC700920C8F /* PBXTargetDependency */ = {
+		035DA2022EEF6292003225F0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilter = ios;
-			target = 03E6B07D2E165DC600920C8F /* PocketBase Watch App */;
-			targetProxy = 03E6B09C2E165DC700920C8F /* PBXContainerItemProxy */;
+			target = 035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */;
+			targetProxy = 035DA2012EEF6292003225F0 /* PBXContainerItemProxy */;
+		};
+		035DA2092EEF6292003225F0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */;
+			targetProxy = 035DA2082EEF6292003225F0 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -697,6 +847,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.briannadoubt.PocketBaseAdmin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -747,6 +898,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.briannadoubt.PocketBaseAdmin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -851,18 +1003,128 @@
 			};
 			name = Release;
 		};
-		03E6B0A02E165DC700920C8F /* Debug */ = {
+		035DA1DD2EEF3CA5003225F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PocketBaseWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PocketBaseWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PocketBaseWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.briannadoubt.PocketBaseAdmin.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		035DA1DE2EEF3CA5003225F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PocketBaseWidgetsExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PocketBaseWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PocketBaseWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.briannadoubt.PocketBaseAdmin.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		035DA20C2EEF6292003225F0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "PocketBaseWatch Watch App/PocketBaseWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = PocketBase;
+				INFOPLIST_FILE = "PocketBaseWatch-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = PocketBaseWatch;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.briannadoubt.PocketBaseAdmin;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -874,27 +1136,31 @@
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
-		03E6B0A12E165DC700920C8F /* Release */ = {
+		035DA20D2EEF6292003225F0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "PocketBaseWatch Watch App/PocketBaseWatch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = PocketBase;
+				INFOPLIST_FILE = "PocketBaseWatch-Watch-App-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = PocketBaseWatch;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.briannadoubt.PocketBaseAdmin;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -905,17 +1171,18 @@
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
-		03E6B0A32E165DC700920C8F /* Debug */ = {
+		035DA20F2EEF6292003225F0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -924,21 +1191,22 @@
 				DEVELOPMENT_TEAM = LU6454UVH5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBase-Watch-AppTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBaseAdmin.PocketBaseWatch-Watch-AppTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PocketBase Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PocketBase Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PocketBaseWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PocketBaseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
-		03E6B0A42E165DC700920C8F /* Release */ = {
+		035DA2102EEF6292003225F0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -947,21 +1215,22 @@
 				DEVELOPMENT_TEAM = LU6454UVH5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBase-Watch-AppTests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBaseAdmin.PocketBaseWatch-Watch-AppTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PocketBase Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PocketBase Watch App";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PocketBaseWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PocketBaseWatch Watch App";
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
-		03E6B0A62E165DC700920C8F /* Debug */ = {
+		035DA2122EEF6292003225F0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -969,21 +1238,22 @@
 				DEVELOPMENT_TEAM = LU6454UVH5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBase-Watch-AppUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBaseAdmin.PocketBaseWatch-Watch-AppUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_TARGET_NAME = "PocketBase Watch App";
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				TEST_TARGET_NAME = "PocketBaseWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
-		03E6B0A72E165DC700920C8F /* Release */ = {
+		035DA2132EEF6292003225F0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -991,17 +1261,18 @@
 				DEVELOPMENT_TEAM = LU6454UVH5;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBase-Watch-AppUITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.briannadoubt.PocketBaseAdmin.PocketBaseWatch-Watch-AppUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				TEST_TARGET_NAME = "PocketBase Watch App";
+				TEST_TARGET_NAME = "PocketBaseWatch Watch App";
 				VALIDATE_PRODUCT = YES;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -1044,34 +1315,50 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		03E6B09F2E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch App" */ = {
+		035DA1DC2EEF3CA5003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWidgetsExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				03E6B0A02E165DC700920C8F /* Debug */,
-				03E6B0A12E165DC700920C8F /* Release */,
+				035DA1DD2EEF3CA5003225F0 /* Debug */,
+				035DA1DE2EEF3CA5003225F0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		03E6B0A22E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch AppTests" */ = {
+		035DA20B2EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				03E6B0A32E165DC700920C8F /* Debug */,
-				03E6B0A42E165DC700920C8F /* Release */,
+				035DA20C2EEF6292003225F0 /* Debug */,
+				035DA20D2EEF6292003225F0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		03E6B0A52E165DC700920C8F /* Build configuration list for PBXNativeTarget "PocketBase Watch AppUITests" */ = {
+		035DA20E2EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch AppTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				03E6B0A62E165DC700920C8F /* Debug */,
-				03E6B0A72E165DC700920C8F /* Release */,
+				035DA20F2EEF6292003225F0 /* Debug */,
+				035DA2102EEF6292003225F0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		035DA2112EEF6292003225F0 /* Build configuration list for PBXNativeTarget "PocketBaseWatch Watch AppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				035DA2122EEF6292003225F0 /* Debug */,
+				035DA2132EEF6292003225F0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = PocketBaseIntents;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
 		030D576D2E11FF0B000E174B /* XCRemoteSwiftPackageReference "Nuke" */ = {
@@ -1110,6 +1397,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 03214DE62D881386004F65F1 /* XCRemoteSwiftPackageReference "KeyPathIterable" */;
 			productName = KeyPathIterable;
+		};
+		035DA1702EEEBAFA003225F0 /* PocketBaseIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBaseIntents;
+		};
+		035DA1E02EEF3EBC003225F0 /* PocketBase */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBase;
+		};
+		035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBaseAdmin;
+		};
+		035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */;
+			productName = PocketBaseIntents;
+		};
+		035DA2142EEF6320003225F0 /* PocketBase */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBase;
+		};
+		035DA2162EEF6320003225F0 /* PocketBaseAdmin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBaseAdmin;
+		};
+		035DA2182EEF6326003225F0 /* PocketBaseIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */;
+			productName = PocketBaseIntents;
 		};
 		037F11EE2D90A587009717C8 /* PocketBaseAdmin */ = {
 			isa = XCSwiftPackageProductDependency;

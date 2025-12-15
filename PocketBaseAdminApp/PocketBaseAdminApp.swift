@@ -9,24 +9,22 @@ import SwiftUI
 import PocketBaseUI
 import PocketBase
 import PocketBaseAdmin
+#if canImport(PocketBaseIntents)
+import PocketBaseIntents
+#endif
 
 @main
 struct PocketBaseAdminApp: App {
-    @Environment(\.dismissWindow) private var dismissWindow
-
-    let createUser: CreateUser<Superuser> = { username, email in
-        Superuser(
-            username: username,
-            email: email,
-            verified: false,
-            emailVisibility: false
-        )
+    init() {
+        // Register background tasks for health checks and notifications
+        #if !os(macOS)
+        BackgroundTaskManager.shared.registerBackgroundTasks()
+        #endif
     }
-    
+
     var body: some Scene {
         WindowGroup("PocketBase Admin", id: "main") {
-            ContentView()
-                .authenticated(newUser: createUser)
+            AdminRootView()
 #if targetEnvironment(simulator) || os(macOS)
                 .pocketbase(.localhost)
 #elseif DEBUG
@@ -35,6 +33,9 @@ struct PocketBaseAdminApp: App {
                 .pocketbase(url: URL(string: "https://api.pocketbase.app")!)
 #endif
         }
+#if os(macOS)
+        .defaultSize(width: 1200, height: 800)
+#endif
         .commands {
             InspectorCommands()
             SidebarCommands()
@@ -42,53 +43,59 @@ struct PocketBaseAdminApp: App {
             TextEditingCommands()
             TextFormattingCommands()
         }
-        
-        #if os(macOS) || os(visionOS)
-        WindowGroup("Authentication", id: "auth") {
-            AuthenticationContentView(createUser: createUser)
-                .onAppear {
-                    dismissWindow(id: "main")
-                }
-        }
-        .pocketbase(.localhost)
-        .windowIdealSize(.fitToContent)
-        #endif // os(macOS) || os(visionOS)
     }
 }
 
-struct AuthenticationContentView: View {
-    #if os(macOS) || os(visionOS)
-    @Environment(\.dismissWindow) private var dismissWindow
-    #endif
+/// Root view that handles admin authentication state
+struct AdminRootView: View {
     @Environment(\.pocketbase) private var pocketbase
-    
-    @State private var authState: AuthState = .signedOut
-    
-    let createUser: CreateUser<Superuser>
-    
+    @State private var isAuthenticated = false
+    @State private var isCheckingAuth = true
+
     var body: some View {
-        switch authState {
-        case .loading:
-            ProgressView()
-        case .signedIn:
-            ContentUnavailableView {
-                Label("You've authenticated successfully!", systemImage: "party.popper.fill")
-            } description: {
-                Text("You can close this window and return to the app.")
-            } actions: {
-                #if os(macOS) || os(visionOS)
-                Button("Let's go!") {
-                    dismissWindow(id: "auth")
+        Group {
+            if isCheckingAuth {
+                ProgressView("Checking authentication...")
+            } else if isAuthenticated {
+                ContentView()
+            } else {
+                AdminLoginView {
+                    isAuthenticated = true
                 }
-                .buttonStyle(.borderedProminent)
-                #endif
             }
-        case .signedOut:
-            SignedOutView(
-                collection: pocketbase.collection(Superuser.self),
-                authState: $authState,
-                newUser: createUser
-            )
         }
+        .task {
+            await checkAuthentication()
+        }
+        .onChange(of: pocketbase.authStore.isValid) { _, isValid in
+            isAuthenticated = isValid
+            // Re-sync intent configuration when auth changes
+            if isValid {
+                Task {
+                    await syncIntentConfiguration()
+                }
+            }
+        }
+    }
+
+    private func checkAuthentication() async {
+        // Small delay to let authStore initialize
+        try? await Task.sleep(for: .milliseconds(100))
+        isAuthenticated = pocketbase.authStore.isValid
+        isCheckingAuth = false
+
+        // Sync configuration for App Intents (Siri, Shortcuts, Widgets)
+        await syncIntentConfiguration()
+
+        // Request notification permissions when authenticated
+        if isAuthenticated {
+            await BackgroundTaskManager.shared.requestNotificationPermissions()
+        }
+    }
+
+    private func syncIntentConfiguration() async {
+        #if canImport(PocketBaseIntents)
+        await ServerConfiguration.shared.syncFromPocketBase(pocketbase)
+        #endif
     }
 }

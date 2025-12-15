@@ -254,7 +254,7 @@ struct LogInspectorView: View {
             }
         }
         .padding()
-        .frame(width: 300)
+        .frame(minWidth: 300)
     }
 }
 
@@ -357,7 +357,7 @@ struct LogsSettingsView: View {
             }
         }
         .padding()
-        .frame(width: 400, height: 300)
+        .frame(minWidth: 400, minHeight: 300)
     }
 }
 
@@ -388,6 +388,8 @@ struct LogsSelectionToolbarView: View {
 
 private struct ChartSection: View {
     let state: LogsState
+    @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 120
+
     var body: some View {
         if !state.chartData.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
@@ -405,7 +407,7 @@ private struct ChartSection: View {
                     )
                     .foregroundStyle(.red.opacity(0.2))
                 }
-                .frame(height: 120)
+                .frame(minHeight: chartHeight)
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .day)) { value in
                         AxisGridLine()

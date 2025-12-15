@@ -301,6 +301,8 @@ struct CollectionExportRow: View {
     let isSelected: Bool
     let onToggle: () -> Void
 
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 20
+
     var body: some View {
         Button(action: onToggle) {
             HStack {
@@ -310,7 +312,7 @@ struct CollectionExportRow: View {
                 Image(collection.type.image)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 20, height: 20)
+                    .frame(width: iconSize, height: iconSize)
 
                 Text(collection.name)
 

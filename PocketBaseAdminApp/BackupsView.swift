@@ -8,6 +8,11 @@
 import SwiftUI
 import PocketBase
 import PocketBaseAdmin
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 struct BackupsView: View {
     @State private var backups: [BackupModel] = []
@@ -20,6 +25,10 @@ struct BackupsView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var backupToDelete: BackupModel?
+
+    @State private var showRestoreConfirmation = false
+    @State private var backupToRestore: BackupModel?
+    @State private var isRestoring = false
 
     @State private var showOptionsSheet = false
 
@@ -63,6 +72,13 @@ struct BackupsView: View {
                         ForEach(backups) { backup in
                             BackupRow(
                                 backup: backup,
+                                onDownload: {
+                                    await downloadBackup(backup)
+                                },
+                                onRestore: {
+                                    backupToRestore = backup
+                                    showRestoreConfirmation = true
+                                },
                                 onDelete: {
                                     backupToDelete = backup
                                     showDeleteConfirmation = true
@@ -176,6 +192,22 @@ struct BackupsView: View {
                 Text("Are you sure you want to delete \"\(backup.key)\"? This action cannot be undone.")
             }
         }
+        .alert("Restore Backup?", isPresented: $showRestoreConfirmation) {
+            Button("Cancel", role: .cancel) {
+                backupToRestore = nil
+            }
+            Button("Restore", role: .destructive) {
+                if let backup = backupToRestore {
+                    Task {
+                        await restoreBackup(backup)
+                    }
+                }
+            }
+        } message: {
+            if let backup = backupToRestore {
+                Text("WARNING: This will replace the current database with \"\(backup.key)\". All data created after this backup will be lost. The server will restart after restoration. This action cannot be undone.")
+            }
+        }
     }
 
     private func loadBackups() async {
@@ -220,10 +252,39 @@ struct BackupsView: View {
             errorMessage = error.localizedDescription
         }
     }
+
+    private func downloadBackup(_ backup: BackupModel) async {
+        let url = await pocketbase.admin.backups.downloadURL(name: backup.key)
+        #if os(macOS)
+        await NSWorkspace.shared.open(url)
+        #else
+        await UIApplication.shared.open(url)
+        #endif
+    }
+
+    private func restoreBackup(_ backup: BackupModel) async {
+        isRestoring = true
+        errorMessage = nil
+        defer {
+            isRestoring = false
+            backupToRestore = nil
+        }
+
+        do {
+            try await pocketbase.admin.backups.restore(name: backup.key)
+            // Server will restart, so we may lose connection
+            // Show a message to the user
+            errorMessage = "Restore initiated. The server is restarting..."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 struct BackupRow: View {
     let backup: BackupModel
+    let onDownload: () async -> Void
+    let onRestore: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -242,12 +303,33 @@ struct BackupRow: View {
 
             Spacer()
 
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                Image(systemName: "trash")
+            HStack(spacing: 8) {
+                Button {
+                    Task {
+                        await onDownload()
+                    }
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Download backup")
+
+                Button {
+                    onRestore()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Restore from backup")
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("Delete backup")
             }
-            .buttonStyle(.borderless)
         }
         .padding()
     }

@@ -23,6 +23,9 @@ struct MailSettingsView: View {
     @State private var smtpLocalName = ""
 
     @State private var isSaving = false
+    @State private var isTesting = false
+    @State private var testEmail = ""
+    @State private var showTestSheet = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
 
@@ -96,11 +99,36 @@ struct MailSettingsView: View {
                             .autocapitalization(.none)
                         #endif
                     }
+
+                    Section {
+                        Button {
+                            showTestSheet = true
+                        } label: {
+                            Label("Send Test Email", systemImage: "paperplane")
+                        }
+                    } footer: {
+                        Text("Send a test email to verify your SMTP configuration is working correctly.")
+                    }
                 }
             }
             .safeAreaPadding()
         }
         .navigationTitle("Mail settings")
+        .sheet(isPresented: $showTestSheet) {
+            TestEmailSheet(
+                testEmail: $testEmail,
+                isTesting: isTesting,
+                onTest: {
+                    Task {
+                        await sendTestEmail()
+                    }
+                },
+                onCancel: {
+                    showTestSheet = false
+                    testEmail = ""
+                }
+            )
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -163,5 +191,70 @@ struct MailSettingsView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func sendTestEmail() async {
+        isTesting = true
+        errorMessage = nil
+        successMessage = nil
+        defer {
+            isTesting = false
+            showTestSheet = false
+            testEmail = ""
+        }
+
+        do {
+            try await pocketbase.admin.settings.testEmail(to: testEmail)
+            successMessage = "Test email sent successfully"
+        } catch {
+            errorMessage = "Failed to send test email: \(error.localizedDescription)"
+        }
+    }
+}
+
+struct TestEmailSheet: View {
+    @Binding var testEmail: String
+    let isTesting: Bool
+    let onTest: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Email address", text: $testEmail)
+                    #if os(iOS)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                    #endif
+                } header: {
+                    Text("Recipient")
+                } footer: {
+                    Text("Enter the email address to send a test verification email to.")
+                }
+            }
+            .navigationTitle("Send Test Email")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                    .disabled(isTesting)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Send") {
+                        onTest()
+                    }
+                    .disabled(isTesting || testEmail.isEmpty)
+                }
+            }
+            .interactiveDismissDisabled(isTesting)
+        }
+        .presentationDetents([.medium])
     }
 }

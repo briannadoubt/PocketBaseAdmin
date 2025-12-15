@@ -20,6 +20,7 @@ struct FilesSettingsView: View {
     @State private var forcePathStyleAddressing = false
 
     @State private var isSaving = false
+    @State private var isTesting = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
 
@@ -94,6 +95,24 @@ struct FilesSettingsView: View {
                     } footer: {
                         Text("Enable this for S3-compatible services that require path-style URLs (e.g., MinIO).")
                     }
+
+                    Section {
+                        Button {
+                            Task {
+                                await testS3Connection()
+                            }
+                        } label: {
+                            if isTesting {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label("Test S3 Connection", systemImage: "checkmark.icloud")
+                            }
+                        }
+                        .disabled(isTesting)
+                    } footer: {
+                        Text("Verify your S3 configuration is working correctly.")
+                    }
                 }
             }
             .safeAreaPadding()
@@ -161,6 +180,20 @@ struct FilesSettingsView: View {
             successMessage = "Settings saved successfully"
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func testS3Connection() async {
+        isTesting = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isTesting = false }
+
+        do {
+            try await pocketbase.admin.settings.testS3()
+            successMessage = "S3 connection successful"
+        } catch {
+            errorMessage = "S3 test failed: \(error.localizedDescription)"
         }
     }
 }

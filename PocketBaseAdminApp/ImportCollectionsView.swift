@@ -25,6 +25,8 @@ struct ImportCollectionsView: View {
     @Environment(\.pocketbase) private var pocketbase
     @Environment(CollectionsState.self) private var collectionsState
 
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 20
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -123,7 +125,7 @@ struct ImportCollectionsView: View {
                                 Image(collection.type.image)
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 20, height: 20)
+                                    .frame(width: iconSize, height: iconSize)
                                 Text(collection.name)
                                 Spacer()
                                 Text("\(collection.schema?.count ?? 0) fields")

@@ -17,5 +17,15 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.briannadoubt.PocketBaseAdmin.healthcheck</string>
+		<string>com.briannadoubt.PocketBaseAdmin.backupreminder</string>
+	</array>
 </dict>
 </plist>

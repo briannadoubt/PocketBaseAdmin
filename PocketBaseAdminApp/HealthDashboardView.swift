@@ -16,6 +16,7 @@ struct HealthDashboardView: View {
     @State private var lastChecked: Date?
 
     @Environment(\.pocketbase) private var pocketbase
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
 
     var body: some View {
         ScrollView {
@@ -25,11 +26,11 @@ struct HealthDashboardView: View {
                     if isLoading {
                         ProgressView()
                             .scaleEffect(1.5)
-                            .frame(height: 60)
+                            .frame(minHeight: iconSize)
                     } else if let errorMessage {
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: iconSize))
                                 .foregroundStyle(.red)
                             Text("Connection Error")
                                 .font(.headline)
@@ -41,7 +42,7 @@ struct HealthDashboardView: View {
                     } else if let health = healthStatus {
                         VStack(spacing: 12) {
                             Image(systemName: health.code == 200 ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .font(.system(size: 48))
+                                .font(.system(size: iconSize))
                                 .foregroundStyle(health.code == 200 ? .green : .red)
 
                             Text(health.message)
@@ -56,7 +57,7 @@ struct HealthDashboardView: View {
                     } else {
                         VStack(spacing: 12) {
                             Image(systemName: "questionmark.circle")
-                                .font(.system(size: 48))
+                                .font(.system(size: iconSize))
                                 .foregroundStyle(.secondary)
                             Text("Not checked yet")
                                 .font(.headline)

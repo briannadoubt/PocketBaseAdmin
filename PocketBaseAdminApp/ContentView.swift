@@ -38,13 +38,14 @@ struct NavigationGroup: View {
 struct ContentView: View {
     @State private var collectionsState = CollectionsState()
     @State private var settings = Admin.Settings()
-    
+
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    
-    @AppStorage("io.pocketbase.admin.tabCustomization") var tabCustomization = TabViewCustomization()
-    
+
+    @AppStorage("io.pocketbase.admin.tabCustomization.v2") var tabCustomization = TabViewCustomization()
+
     @State private var selectedTab: String?
+    @State private var showNewCollectionSheet = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -61,7 +62,41 @@ struct ContentView: View {
 #endif
             } else {
                 TabSection {
-                    ForEach(collectionsState.collections) { state in
+                    if collectionsState.isLoading && collectionsState.collections.isEmpty {
+                        Tab(value: "loading") {
+                            ProgressView("Connecting to server...")
+                        } label: {
+                            Label("Loading...", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                .symbolEffect(.rotate, isActive: true)
+                        }
+                    }
+                    ForEach(collectionsState.userCollections) { state in
+                        Tab(value: state.collection.id) {
+                            NavigationStack {
+                                CollectionView(state: state)
+                            }
+                        } label: {
+                            Label {
+                                Text(state.collection.name)
+                            } icon: {
+                                Image(state.collection.type.image)
+                                    .resizable()
+                                    .scaledToFit()
+                            }
+                        }
+                        .customizationID(state.collection.id)
+                        .defaultVisibility(.hidden, for: .tabBar)
+                    }
+
+                } header: {
+                    AdminTab.collections.label
+                }
+                #if !os(macOS)
+                .customizationBehavior(.disabled, for: .tabBar, .sidebar)
+                #endif
+
+                TabSection {
+                    ForEach(collectionsState.systemCollections) { state in
                         Tab(value: state.collection.id) {
                             NavigationStack {
                                 CollectionView(state: state)
@@ -79,9 +114,10 @@ struct ContentView: View {
                         .defaultVisibility(.hidden, for: .tabBar)
                     }
                 } header: {
-                    AdminTab.collections.label
+                    Label("System Collections", systemImage: "gearshape.2")
                 }
                 #if !os(macOS)
+                .defaultVisibility(.hidden, for: .sidebar)
                 .customizationBehavior(.disabled, for: .tabBar, .sidebar)
                 #endif
             }
@@ -148,6 +184,15 @@ struct ContentView: View {
                         SettingsScreen.backups.label
                     }
                     .customizationID(SettingsScreen.backups.rawValue)
+
+                    Tab(value: SettingsScreen.health.rawValue) {
+                        NavigationStack {
+                            HealthDashboardView()
+                        }
+                    } label: {
+                        SettingsScreen.health.label
+                    }
+                    .customizationID(SettingsScreen.health.rawValue)
                 }
                 .customizationID("System")
                 
@@ -205,6 +250,14 @@ struct ContentView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($tabCustomization)
+        .tabViewSidebarHeader {
+            Button {
+                showNewCollectionSheet = true
+            } label: {
+                Label("New Collection", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.borderless)
+        }
         .task {
             await collectionsState.load(from: pocketbase)
         }
@@ -212,9 +265,19 @@ struct ContentView: View {
             do {
                 try await settings.load(pocketbase: pocketbase)
             } catch {
-                print("⚠️ Failed to load settings: \(String(describing: error))")
-                // Show a non-blocking error notification
+                print("Failed to load settings: \(error.localizedDescription)")
             }
+        }
+        .sheet(isPresented: $showNewCollectionSheet) {
+            CollectionEditorView(
+                collection: nil,
+                onSave: { newCollection in
+                    Task {
+                        await collectionsState.load(from: pocketbase)
+                        selectedTab = newCollection.id
+                    }
+                }
+            )
         }
         .environment(collectionsState)
         .environment(settings)

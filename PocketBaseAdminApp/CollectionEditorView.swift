@@ -25,6 +25,17 @@ struct CollectionEditorView: View {
     @State private var updateRule: String = ""
     @State private var deleteRule: String = ""
 
+    // Auth collection email templates
+    @State private var verificationSubject: String = ""
+    @State private var verificationBody: String = ""
+    @State private var resetPasswordSubject: String = ""
+    @State private var resetPasswordBody: String = ""
+    @State private var confirmEmailChangeSubject: String = ""
+    @State private var confirmEmailChangeBody: String = ""
+    @State private var authAlertEnabled: Bool = false
+    @State private var authAlertSubject: String = ""
+    @State private var authAlertBody: String = ""
+
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showFieldEditor = false
@@ -101,6 +112,52 @@ struct CollectionEditorView: View {
                 } footer: {
                     Text("Leave empty for public access. Set to nil/null to lock.")
                 }
+
+                if type == .auth {
+                    Section {
+                        EmailTemplateEditor(
+                            title: "Verification Email",
+                            subject: $verificationSubject,
+                            bodyText: $verificationBody
+                        )
+                    } header: {
+                        Text("Email Templates")
+                    } footer: {
+                        Text("Placeholders: {APP_NAME}, {APP_URL}, {TOKEN}, {ACTION_URL}")
+                    }
+
+                    Section {
+                        EmailTemplateEditor(
+                            title: "Password Reset",
+                            subject: $resetPasswordSubject,
+                            bodyText: $resetPasswordBody
+                        )
+                    }
+
+                    Section {
+                        EmailTemplateEditor(
+                            title: "Confirm Email Change",
+                            subject: $confirmEmailChangeSubject,
+                            bodyText: $confirmEmailChangeBody
+                        )
+                    }
+
+                    Section {
+                        Toggle("Enable Auth Alert", isOn: $authAlertEnabled)
+
+                        if authAlertEnabled {
+                            EmailTemplateEditor(
+                                title: "Login Alert",
+                                subject: $authAlertSubject,
+                                bodyText: $authAlertBody
+                            )
+                        }
+                    } header: {
+                        Text("Auth Alert")
+                    } footer: {
+                        Text("Send email notifications when users login from a new location.")
+                    }
+                }
             }
             .navigationTitle(isEditing ? "Edit Collection" : "New Collection")
             #if os(iOS)
@@ -153,6 +210,19 @@ struct CollectionEditorView: View {
         createRule = collection.createRule ?? ""
         updateRule = collection.updateRule ?? ""
         deleteRule = collection.deleteRule ?? ""
+
+        // Load email templates for auth collections
+        if collection.type == .auth {
+            verificationSubject = collection.verificationTemplate?.subject ?? ""
+            verificationBody = collection.verificationTemplate?.body ?? ""
+            resetPasswordSubject = collection.resetPasswordTemplate?.subject ?? ""
+            resetPasswordBody = collection.resetPasswordTemplate?.body ?? ""
+            confirmEmailChangeSubject = collection.confirmEmailChangeTemplate?.subject ?? ""
+            confirmEmailChangeBody = collection.confirmEmailChangeTemplate?.body ?? ""
+            authAlertEnabled = collection.authAlert?.enabled ?? false
+            authAlertSubject = collection.authAlert?.emailTemplate?.subject ?? ""
+            authAlertBody = collection.authAlert?.emailTemplate?.body ?? ""
+        }
     }
 
     private func saveCollection() async {
@@ -161,6 +231,20 @@ struct CollectionEditorView: View {
         defer { isSaving = false }
 
         let schemaFields = fields.map { $0.toField() }
+
+        // Build email templates for auth collections
+        let verification: EmailTemplate? = type == .auth && (!verificationSubject.isEmpty || !verificationBody.isEmpty)
+            ? EmailTemplate(subject: verificationSubject, body: verificationBody) : nil
+        let resetPassword: EmailTemplate? = type == .auth && (!resetPasswordSubject.isEmpty || !resetPasswordBody.isEmpty)
+            ? EmailTemplate(subject: resetPasswordSubject, body: resetPasswordBody) : nil
+        let confirmEmailChange: EmailTemplate? = type == .auth && (!confirmEmailChangeSubject.isEmpty || !confirmEmailChangeBody.isEmpty)
+            ? EmailTemplate(subject: confirmEmailChangeSubject, body: confirmEmailChangeBody) : nil
+        let authAlertConfig: AuthAlertConfig? = type == .auth
+            ? AuthAlertConfig(
+                enabled: authAlertEnabled,
+                emailTemplate: authAlertEnabled && (!authAlertSubject.isEmpty || !authAlertBody.isEmpty)
+                    ? EmailTemplate(subject: authAlertSubject, body: authAlertBody) : nil
+            ) : nil
 
         do {
             let savedCollection: CollectionModel
@@ -174,7 +258,11 @@ struct CollectionEditorView: View {
                     viewRule: viewRule.isEmpty ? nil : viewRule,
                     createRule: createRule.isEmpty ? nil : createRule,
                     updateRule: updateRule.isEmpty ? nil : updateRule,
-                    deleteRule: deleteRule.isEmpty ? nil : deleteRule
+                    deleteRule: deleteRule.isEmpty ? nil : deleteRule,
+                    verificationTemplate: verification,
+                    resetPasswordTemplate: resetPassword,
+                    confirmEmailChangeTemplate: confirmEmailChange,
+                    authAlert: authAlertConfig
                 )
                 savedCollection = try await pocketbase.admin.collections.update(id: collection.id, request)
             } else {
@@ -187,7 +275,11 @@ struct CollectionEditorView: View {
                     viewRule: viewRule.isEmpty ? nil : viewRule,
                     createRule: createRule.isEmpty ? nil : createRule,
                     updateRule: updateRule.isEmpty ? nil : updateRule,
-                    deleteRule: deleteRule.isEmpty ? nil : deleteRule
+                    deleteRule: deleteRule.isEmpty ? nil : deleteRule,
+                    verificationTemplate: verification,
+                    resetPasswordTemplate: resetPassword,
+                    confirmEmailChangeTemplate: confirmEmailChange,
+                    authAlert: authAlertConfig
                 )
                 savedCollection = try await pocketbase.admin.collections.create(request)
             }
@@ -370,6 +462,59 @@ struct RuleEditor: View {
                     Text("custom")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+}
+
+struct EmailTemplateEditor: View {
+    let title: String
+    @Binding var subject: String
+    @Binding var bodyText: String
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Subject")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("Email subject", text: $subject)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.sentences)
+                    #endif
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Body")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextEditor(text: $bodyText)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 120)
+                        .padding(4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                }
+            }
+            .padding(.vertical, 4)
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                if subject.isEmpty && bodyText.isEmpty {
+                    Text("default")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("custom")
+                        .font(.caption)
+                        .foregroundStyle(.blue)
                 }
             }
         }

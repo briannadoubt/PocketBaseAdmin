@@ -29,12 +29,20 @@ final class CollectionState: Identifiable {
     
     var searchQuery: String = ""
     
+    /// Get all relation field names for expanding
+    private var relationFieldNames: String? {
+        let names = (collection.fields ?? [])
+            .filter { $0.type == .relation }
+            .map(\.name)
+        return names.isEmpty ? nil : names.joined(separator: ",")
+    }
+
     @concurrent
     func load(with pocketbase: PocketBase, sort: String? = nil) async {
         do {
             let newRecords = try await pocketbase.admin
                 .records(collection.name)
-                .list(page: page, sort: sort)
+                .list(page: page, sort: sort, expand: relationFieldNames)
                 .items
             await MainActor.run {
                 records = newRecords
@@ -105,7 +113,7 @@ struct CollectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(CollectionsState.self) private var collectionsState
     
-    @State private var selectedInpector: InspectorTab?
+    @State private var selectedInpector: InspectorTab? = .api
     
     enum InspectorTab: String, CaseIterable, Identifiable {
         case record
@@ -132,7 +140,8 @@ struct CollectionView: View {
                 TableColumn("Compact") { record in
                     CompactRecordRow(
                         schema: schema,
-                        record: record
+                        record: record,
+                        collectionsState: collectionsState
                     )
                 }
             }
@@ -147,13 +156,14 @@ struct CollectionView: View {
                         system: true,
                         type: .text
                     ),
-                    record: record
+                    record: record,
+                    collectionsState: collectionsState
                 )
             }
-            
+
             TableColumnForEach(schema, id: \.id) { field in
                 TableColumn(field.name) { record in
-                    FieldView(field: field, record: record)
+                    FieldView(field: field, record: record, collectionsState: collectionsState)
                 }
             }
         }
@@ -171,7 +181,7 @@ struct CollectionView: View {
                 get: { self.selectedInpector != nil },
                 set: { _ in })
         ) {
-            VStack {
+            VStack(spacing: 0) {
                 Picker(
                     selection: Binding {
                         selectedInpector ?? .record
@@ -180,55 +190,56 @@ struct CollectionView: View {
                     }
                 ) {
                     ForEach(InspectorTab.allCases) { tab in
-                        Text(tab.title)
+                        Text(tab.title).tag(tab)
                     }
                 } label: {
                     EmptyView()
                 }
-            }
-            switch selectedInpector {
-            case .record:
-                if
-                    let selectedRecordModel,
-                    let record = state.records.first(
-                        where: { $0.id == selectedRecordModel.id }
-                    )
-                {
-                    RecordInspectorView(record: record, schema: schema) { recordToEdit in
-                        editingRecord = recordToEdit
-                        showRecordEditor = true
-                    }
-                } else {
-                    ContentUnavailableView(
-                        "No record selected",
-                        systemImage: "doc"
-                    )
-                }
-            case .schema:
-                SchemaInspectorView(
-                    collection: state.collection,
-                    onEdit: {
-                        showCollectionEditor = true
-                    },
-                    onDelete: {
-                        Task {
-                            await deleteCollection()
+                .padding()
+
+                Group {
+                    switch selectedInpector {
+                    case .record:
+                        if
+                            let selectedRecordModel,
+                            let record = state.records.first(
+                                where: { $0.id == selectedRecordModel.id }
+                            )
+                        {
+                            RecordInspectorView(record: record, schema: schema, collectionsState: collectionsState) { recordToEdit in
+                                editingRecord = recordToEdit
+                                showRecordEditor = true
+                            }
+                        } else {
+                            ContentUnavailableView(
+                                "No record selected",
+                                systemImage: "doc"
+                            )
                         }
+                    case .schema:
+                        SchemaInspectorView(
+                            collection: state.collection,
+                            onEdit: {
+                                showCollectionEditor = true
+                            },
+                            onDelete: {
+                                Task {
+                                    await deleteCollection()
+                                }
+                            }
+                        )
+                    case .api:
+                        SwiftAPIPreviewView(collection: state.collection)
+                    case nil:
+                        ContentUnavailableView(
+                            "What the heck are you even doing?? Get a life.",
+                            systemImage: "questionmark"
+                        )
                     }
-                )
-            case .api:
-                ContentUnavailableView(
-                    "API Preview Unavailable",
-                    systemImage: "xmark",
-                    description: Text("")
-                )
-            case nil:
-                ContentUnavailableView(
-                    "What the heck are you even doing?? Get a life.",
-                    systemImage: "questionmark"
-                )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            
+            .inspectorColumnWidth(min: 300, ideal: 400, max: 600)
         }
         .toolbar {
 #if !os(macOS)
@@ -253,9 +264,23 @@ struct CollectionView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Button("New Record", systemImage: "plus") {
+                Button {
                     editingRecord = nil
                     showRecordEditor = true
+                } label: {
+                    Label("New Record", systemImage: "doc.badge.plus")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    if selectedInpector == nil {
+                        selectedInpector = .api
+                    } else {
+                        selectedInpector = nil
+                    }
+                } label: {
+                    Label("Inspector", systemImage: "sidebar.trailing")
                 }
             }
         }
@@ -332,13 +357,14 @@ struct CollectionView: View {
 struct CompactRecordRow: View {
     var schema: [Field]
     var record: RecordModel
+    var collectionsState: CollectionsState?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack {
                 ForEach(schema, id: \.name) { field in
                     VStack(alignment: .leading) {
-                        FieldView(field: field, record: record)
+                        FieldView(field: field, record: record, collectionsState: collectionsState)
                         Text(field.name)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -352,6 +378,7 @@ struct CompactRecordRow: View {
 struct RecordInspectorView: View {
     let record: RecordModel?
     let schema: [Field]
+    var collectionsState: CollectionsState?
     var onEdit: ((RecordModel) -> Void)?
 
     var body: some View {
@@ -380,7 +407,8 @@ struct RecordInspectorView: View {
                                     system: false,
                                     type: .text
                                 ),
-                                record: record
+                                record: record,
+                                collectionsState: collectionsState
                             )
                             if case let .bool(verified) = record
                                 .content["verified"] ?? .null, verified {
@@ -392,7 +420,7 @@ struct RecordInspectorView: View {
                             HStack(alignment: .top) {
                                 Text(field.name).fontWeight(.semibold)
                                 Spacer()
-                                FieldView(field: field, record: record)
+                                FieldView(field: field, record: record, collectionsState: collectionsState)
                             }
                         }
                     }
@@ -406,9 +434,7 @@ struct RecordInspectorView: View {
                 )
             }
         }
-        #if os(macOS)
-        .frame(maxWidth: 320, maxHeight: .infinity, alignment: .top)
-        #endif
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.gray.opacity(0.07))
     }
 }
@@ -438,7 +464,51 @@ struct MailLink: View {
 struct FieldView: View {
     var field: Field
     var record: RecordModel
-    
+    var collectionsState: CollectionsState?
+
+    /// Get presentable field values from an expanded relation record
+    private func presentableValue(from expandedRecord: [String: JSONValue], collectionId: String?) -> String? {
+        guard let collectionId,
+              let collectionsState,
+              let relatedCollection = collectionsState.collections.first(where: { $0.collection.id == collectionId })?.collection
+        else {
+            // Fallback: try common presentable field names
+            for key in ["name", "title", "label", "username", "email"] {
+                if case .string(let value) = expandedRecord[key] {
+                    return value
+                }
+            }
+            return nil
+        }
+
+        // Find fields marked as presentable
+        let presentableFields = (relatedCollection.fields ?? []).filter { $0.presentable == true }
+
+        if presentableFields.isEmpty {
+            // Fallback: try common presentable field names
+            for key in ["name", "title", "label", "username", "email"] {
+                if case .string(let value) = expandedRecord[key] {
+                    return value
+                }
+            }
+            return nil
+        }
+
+        // Collect presentable values
+        let values = presentableFields.compactMap { field -> String? in
+            guard let value = expandedRecord[field.name] else { return nil }
+            switch value {
+            case .string(let str): return str
+            case .int(let num): return String(num)
+            case .double(let num): return String(num)
+            case .bool(let bool): return bool ? "Yes" : "No"
+            default: return nil
+            }
+        }
+
+        return values.isEmpty ? nil : values.joined(separator: " · ")
+    }
+
     var body: some View {
         switch field.name {
         case "id":
@@ -447,6 +517,20 @@ struct FieldView: View {
             Text(record.collectionId)
         case "collectionName":
             Text(record.collectionName)
+        case "created":
+            if let date = record.created {
+                Text(date, format: .dateTime)
+            } else {
+                Text("(Empty)")
+                    .foregroundStyle(.secondary)
+            }
+        case "updated":
+            if let date = record.updated {
+                Text(date, format: .dateTime)
+            } else {
+                Text("(Empty)")
+                    .foregroundStyle(.secondary)
+            }
         case "expand":
             if let expand = record.expand {
                 JSONValueView(value: .dictionary(expand))
@@ -509,7 +593,14 @@ struct FieldView: View {
                     JSONValueView(value: fieldValue)
                 }
             case .relation:
-                JSONValueView(value: fieldValue)
+                RelationFieldView(
+                    fieldName: field.name,
+                    fieldValue: fieldValue,
+                    expandedData: record.expand,
+                    collectionId: field.options?.collectionId,
+                    collectionsState: collectionsState,
+                    presentableValue: presentableValue
+                )
             case .select:
                 if case .string(let string) = fieldValue {
                     Text(string)
@@ -581,7 +672,7 @@ struct JSONValueView: View {
             VStack {
                 ForEach(Array(dictionary.keys).sorted(), id: \.self) { key in
                     HStack {
-                        Text(key) + Text(verbatim: ":")
+                        Text("\(key):")
                         if let value = dictionary[key] {
                             JSONValueView(value: value)
                         }
@@ -598,6 +689,107 @@ struct JSONValueView: View {
         case .int(let int):
             Text(int, format: .number)
         }
+    }
+}
+
+struct RelationFieldView: View {
+    let fieldName: String
+    let fieldValue: JSONValue
+    let expandedData: [String: JSONValue]?
+    let collectionId: String?
+    let collectionsState: CollectionsState?
+    let presentableValue: ([String: JSONValue], String?) -> String?
+
+    var body: some View {
+        // Check if we have expanded data for this relation
+        if let expandedData,
+           let expanded = expandedData[fieldName] {
+            switch expanded {
+            case .dictionary(let dict):
+                // Single relation - show presentable value
+                if let displayValue = presentableValue(dict, collectionId) {
+                    RelationChip(text: displayValue)
+                } else if case .string(let id) = dict["id"] {
+                    RelationChip(text: id, isId: true)
+                } else {
+                    Text("(Empty)")
+                        .foregroundStyle(.secondary)
+                }
+
+            case .array(let records):
+                // Multiple relations
+                if records.isEmpty {
+                    Text("(Empty)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 4) {
+                        ForEach(records.prefix(3).indices, id: \.self) { idx in
+                            if case .dictionary(let dict) = records[idx] {
+                                if let displayValue = presentableValue(dict, collectionId) {
+                                    RelationChip(text: displayValue)
+                                } else if case .string(let id) = dict["id"] {
+                                    RelationChip(text: id, isId: true)
+                                }
+                            }
+                        }
+                        if records.count > 3 {
+                            Text("+\(records.count - 3)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+            default:
+                JSONValueView(value: fieldValue)
+            }
+        } else {
+            // No expanded data, show raw IDs
+            switch fieldValue {
+            case .string(let id):
+                RelationChip(text: id, isId: true)
+            case .array(let ids):
+                if ids.isEmpty {
+                    Text("(Empty)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    HStack(spacing: 4) {
+                        ForEach(ids.prefix(3).indices, id: \.self) { idx in
+                            if case .string(let id) = ids[idx] {
+                                RelationChip(text: id, isId: true)
+                            }
+                        }
+                        if ids.count > 3 {
+                            Text("+\(ids.count - 3)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            case .null:
+                Text("(Empty)")
+                    .foregroundStyle(.secondary)
+            default:
+                JSONValueView(value: fieldValue)
+            }
+        }
+    }
+}
+
+struct RelationChip: View {
+    let text: String
+    var isId: Bool = false
+
+    var body: some View {
+        Text(isId ? String(text.prefix(8)) + "..." : text)
+            .font(isId ? .system(.caption, design: .monospaced) : .caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isId ? Color.secondary.opacity(0.15) : Color.accentColor.opacity(0.15))
+            )
+            .foregroundStyle(isId ? .secondary : .primary)
     }
 }
 
@@ -712,9 +904,7 @@ struct SchemaInspectorView: View {
             }
             .safeAreaPadding()
         }
-        #if os(macOS)
-        .frame(maxWidth: 320, maxHeight: .infinity, alignment: .top)
-        #endif
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.gray.opacity(0.07))
     }
 
@@ -728,6 +918,757 @@ struct SchemaInspectorView: View {
             return .purple
         }
     }
+}
+
+// MARK: - Swift API Preview
+
+struct SwiftAPIPreviewView: View {
+    let collection: CollectionModel
+
+    @State private var selectedOperation: APIOperation = .list
+
+    enum APIOperation: String, CaseIterable, Identifiable {
+        case list = "List"
+        case query = "Query"
+        case view = "View"
+        case create = "Create"
+        case update = "Update"
+        case delete = "Delete"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .list: return "list.bullet"
+            case .query: return "magnifyingglass"
+            case .view: return "eye"
+            case .create: return "plus"
+            case .update: return "pencil"
+            case .delete: return "trash"
+            }
+        }
+
+        var httpMethod: String {
+            switch self {
+            case .list, .view, .query: return "GET"
+            case .create: return "POST"
+            case .update: return "PATCH"
+            case .delete: return "DELETE"
+            }
+        }
+
+        var methodColor: Color {
+            switch self {
+            case .list, .view, .query: return .green
+            case .create: return .blue
+            case .update: return .orange
+            case .delete: return .red
+            }
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Swift SDK")
+                    .font(.headline)
+
+                // Model definition
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Model Definition")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    CodeBlockView(code: modelDefinitionCode)
+                }
+
+                // Collection instance
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Collection Instance")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    CodeBlockView(code: collectionDefinitionCode)
+                }
+
+                Divider()
+
+                // Operation selector
+                Picker("Operation", selection: $selectedOperation) {
+                    ForEach(APIOperation.allCases) { op in
+                        Text(op.rawValue).tag(op)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                // Code preview
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(operationTitle)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text(operationDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if selectedOperation == .query {
+                        VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("@RealtimeQuery")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.green)
+                                Text("Real-time updates via Server-Sent Events")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                CodeBlockView(code: realtimeQueryCode)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("@StaticQuery")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.blue)
+                                Text("Fetch once with optional filtering")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                CodeBlockView(code: staticQueryCode)
+                            }
+                        }
+                    } else {
+                        CodeBlockView(code: swiftCode)
+                    }
+                }
+
+                Divider()
+
+                // API Details
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("API Details")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    HStack {
+                        Text(selectedOperation.httpMethod)
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundStyle(selectedOperation.methodColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(selectedOperation.methodColor.opacity(0.15))
+                            )
+
+                        Text(apiEndpoint)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if selectedOperation == .list || selectedOperation == .query {
+                    Divider()
+                    queryParametersSection
+                }
+            }
+            .safeAreaPadding()
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.gray.opacity(0.07))
+    }
+
+    private var operationTitle: String {
+        switch selectedOperation {
+        case .list: return "List (\(collection.name))"
+        case .query: return "Query (\(collection.name))"
+        case .view: return "View (\(collection.name))"
+        case .create: return "Create (\(collection.name))"
+        case .update: return "Update (\(collection.name))"
+        case .delete: return "Delete (\(collection.name))"
+        }
+    }
+
+    private var operationDescription: String {
+        switch selectedOperation {
+        case .list: return "Fetch a paginated \(collection.name) records list with #Filter for type-safe filtering."
+        case .query: return "Use @RealtimeQuery or @StaticQuery property wrappers for SwiftUI views."
+        case .view: return "Fetch a single \(collection.name) record by ID."
+        case .create: return "Create a new \(collection.name) record."
+        case .update: return "Update an existing \(collection.name) record."
+        case .delete: return "Delete an existing \(collection.name) record."
+        }
+    }
+
+    private var apiEndpoint: String {
+        switch selectedOperation {
+        case .list, .query: return "/api/collections/\(collection.name)/records"
+        case .view: return "/api/collections/\(collection.name)/records/:id"
+        case .create: return "/api/collections/\(collection.name)/records"
+        case .update: return "/api/collections/\(collection.name)/records/:id"
+        case .delete: return "/api/collections/\(collection.name)/records/:id"
+        }
+    }
+
+    private var collectionDefinitionCode: String {
+        let name = collection.name
+        let typeName = singularized(name).prefix(1).uppercased() + singularized(name).dropFirst()
+
+        return """
+        let pb = PocketBase(url: "http://127.0.0.1:8090")
+        let \(name) = pb.collection(\(typeName).self)
+        """
+    }
+
+    private var modelDefinitionCode: String {
+        let name = collection.name
+        let typeName = singularized(name).prefix(1).uppercased() + singularized(name).dropFirst()
+        let isAuth = collection.type == .auth
+        let macroName = isAuth ? "AuthCollection" : "BaseCollection"
+
+        return """
+        import PocketBase
+
+        @\(macroName)("\(name)")
+        struct \(typeName) {
+        \(fieldDefinitions)
+        }
+        """
+    }
+
+    private var swiftCode: String {
+        let name = collection.name
+        let typeName = singularized(name).prefix(1).uppercased() + singularized(name).dropFirst()
+
+        switch selectedOperation {
+        case .list:
+            return """
+            // Type-safe filtering with #Filter macro
+            let filter = #Filter<\(typeName)> { record in
+                record.created > .distantPast
+            }
+
+            // Fetch a paginated records list
+            let records = try await \(name).list(
+                page: 1,
+                perPage: 50,
+                filter: filter,
+                sort: [.init(\\.created, order: .reverse)]
+            )
+
+            // Or fetch all records at once
+            let allRecords = try await \(name).getFullList(
+                sort: [.init(\\.created, order: .reverse)]
+            )
+
+            // Or fetch the first matching record
+            let record = try await \(name).getFirstListItem(
+                filter: #Filter { $0.id != "" }
+            )
+            """
+
+        case .query:
+            return "" // Handled separately with realtimeQueryCode and staticQueryCode
+
+        case .view:
+            return """
+            // Fetch a single record by ID
+            let record = try await \(name).getOne("RECORD_ID")
+
+            // With expanded relations
+            let expanded = try await \(name).getOne(
+                "RECORD_ID",
+                expand: "relField1,relField2"
+            )
+            """
+
+        case .create:
+            return """
+            // Create a new record
+            let record = try await \(name).create(\(typeName)(
+                \(fieldInitializers)
+            ))
+            """
+
+        case .update:
+            return """
+            // Update an existing record
+            var record = try await \(name).getOne("RECORD_ID")
+            record.someField = "newValue"
+            let saved = try await \(name).update(record.id, body: record)
+            """
+
+        case .delete:
+            return """
+            // Delete a record by ID
+            try await \(name).delete("RECORD_ID")
+            """
+        }
+    }
+
+    private var realtimeQueryCode: String {
+        let name = collection.name
+        let typeName = singularized(name).prefix(1).uppercased() + singularized(name).dropFirst()
+
+        return """
+        struct \(typeName)ListView: View {
+            @RealtimeQuery<\(typeName)>(
+                sort: [.init(\\.created, order: .reverse)]
+            ) private var \(name)
+
+            var body: some View {
+                List(\(name)) { record in
+                    Text(record.id)
+                }
+                .task {
+                    try? await $\(name).start()
+                }
+            }
+        }
+        """
+    }
+
+    private var staticQueryCode: String {
+        let name = collection.name
+        let typeName = singularized(name).prefix(1).uppercased() + singularized(name).dropFirst()
+
+        return """
+        struct \(typeName)ListView: View {
+            @StaticQuery<\(typeName)>(
+                sort: [.init(\\.created, order: .reverse)],
+                filter: #Filter<\(typeName)> { $0.created < .now }
+            ) private var \(name)
+
+            var body: some View {
+                List(\(name)) { record in
+                    Text(record.id)
+                }
+                .task {
+                    try? await \(name).load()
+                }
+            }
+        }
+        """
+    }
+
+    private var fieldDefinitions: String {
+        // Fields auto-generated by macros - don't show in model definition
+        let baseAutoFields: Set<String> = ["id", "created", "updated", "collectionId", "collectionName"]
+        let authAutoFields: Set<String> = ["email", "emailVisibility", "verified", "tokenKey", "password", "passwordConfirm", "username"]
+        let autoFields = collection.type == .auth ? baseAutoFields.union(authAutoFields) : baseAutoFields
+
+        let fields = (collection.fields ?? []).filter { !$0.system && !autoFields.contains($0.name) }
+        if fields.isEmpty {
+            return "    // Add your custom fields here"
+        }
+
+        return fields.map { field in
+            let swiftType = swiftType(for: field)
+            let prefix = fieldPrefix(for: field)
+            return "    \(prefix)var \(field.name): \(swiftType)"
+        }.joined(separator: "\n")
+    }
+
+    private var fieldInitializers: String {
+        // Fields auto-generated by macros - don't show in initializer
+        let baseAutoFields: Set<String> = ["id", "created", "updated", "collectionId", "collectionName"]
+        let authAutoFields: Set<String> = ["email", "emailVisibility", "verified", "tokenKey", "password", "passwordConfirm", "username"]
+        let autoFields = collection.type == .auth ? baseAutoFields.union(authAutoFields) : baseAutoFields
+
+        let fields = (collection.fields ?? []).filter { !$0.system && !autoFields.contains($0.name) }
+        if fields.isEmpty {
+            return "// ..."
+        }
+
+        return fields.prefix(3).map { field in
+            "\(field.name): \(defaultValue(for: field))"
+        }.joined(separator: ",\n        ")
+    }
+
+    private func swiftType(for field: Field) -> String {
+        switch field.type {
+        case .text, .editor, .email, .url:
+            return field.required == true ? "String" : "String?"
+        case .number:
+            return field.required == true ? "Int" : "Int?"
+        case .bool:
+            return field.required == true ? "Bool" : "Bool?"
+        case .date, .dateTime, .autodate:
+            return field.required == true ? "Date" : "Date?"
+        case .select:
+            if field.options?.maxSelect ?? 1 > 1 {
+                return "[String]"
+            }
+            return field.required == true ? "String" : "String?"
+        case .file:
+            if field.options?.maxSelect ?? 1 > 1 {
+                return "[FileValue]?"
+            }
+            return "FileValue?"
+        case .relation:
+            return "[RelatedRecord]?"
+        case .json:
+            return "[String: Any]?"
+        case .password, .customEmail:
+            return "String?"
+        }
+    }
+
+    private func fieldPrefix(for field: Field) -> String {
+        switch field.type {
+        case .file:
+            return "@File "
+        case .relation:
+            return "@Relation "
+        default:
+            return ""
+        }
+    }
+
+    private func defaultValue(for field: Field) -> String {
+        switch field.type {
+        case .text, .editor, .email, .url, .select:
+            return "\"\""
+        case .number:
+            return "0"
+        case .bool:
+            return "false"
+        case .date, .dateTime, .autodate:
+            return "Date()"
+        case .file, .relation, .json:
+            return "nil"
+        case .password, .customEmail:
+            return "nil"
+        }
+    }
+
+    private var queryParameters: [QueryParam] {
+        [
+            QueryParam(name: "page", type: "Int", description: "The page number (default: 1)"),
+            QueryParam(name: "perPage", type: "Int", description: "Records per page (default: 30, max: 500)"),
+            QueryParam(name: "sort", type: "String", description: "Sort expression, e.g. \"-created,title\""),
+            QueryParam(name: "filter", type: "String", description: "Filter expression, e.g. \"status='active'\""),
+            QueryParam(name: "expand", type: "String", description: "Relations to expand, e.g. \"user,tags\""),
+        ]
+    }
+
+    @ViewBuilder
+    private var queryParametersSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Query Parameters")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 8) {
+                GridRow {
+                    Text("Param")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Type")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Description")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+                    .gridCellColumns(3)
+
+                ForEach(queryParameters) { param in
+                    GridRow {
+                        Text(param.name)
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.medium)
+
+                        Text(param.type)
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.orange.opacity(0.15))
+                            )
+
+                        Text(param.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+        .padding(.bottom)
+    }
+
+    /// Convert plural collection name to singular type name
+    private func singularized(_ name: String) -> String {
+        let lowercased = name.lowercased()
+
+        // Uncountable words - same in singular and plural
+        let uncountables: Set<String> = [
+            "equipment", "information", "rice", "money", "species", "series",
+            "fish", "sheep", "deer", "aircraft", "salmon", "trout", "swine",
+            "moose", "bison", "corps", "means", "offspring", "news", "metadata"
+        ]
+        if uncountables.contains(lowercased) {
+            return name
+        }
+
+        // Irregular plurals (plural -> singular)
+        let irregulars: [String: String] = [
+            "people": "person",
+            "children": "child",
+            "mice": "mouse",
+            "lice": "louse",
+            "geese": "goose",
+            "men": "man",
+            "women": "woman",
+            "teeth": "tooth",
+            "feet": "foot",
+            "oxen": "ox",
+            "indices": "index",
+            "matrices": "matrix",
+            "vertices": "vertex",
+            "axes": "axis",
+            "analyses": "analysis",
+            "diagnoses": "diagnosis",
+            "theses": "thesis",
+            "crises": "crisis",
+            "phenomena": "phenomenon",
+            "criteria": "criterion",
+            "data": "datum",
+            "media": "medium",
+            "strata": "stratum",
+            "cacti": "cactus",
+            "foci": "focus",
+            "fungi": "fungus",
+            "nuclei": "nucleus",
+            "syllabi": "syllabus",
+            "alumni": "alumnus",
+            "octopi": "octopus",
+            "radii": "radius",
+            "stimuli": "stimulus",
+            "larvae": "larva",
+            "antennae": "antenna",
+            "formulae": "formula",
+            "nebulae": "nebula",
+            "vertebrae": "vertebra",
+            "lives": "life",
+            "wives": "wife",
+            "knives": "knife",
+            "leaves": "leaf",
+            "halves": "half",
+            "selves": "self",
+            "elves": "elf",
+            "loaves": "loaf",
+            "wolves": "wolf",
+            "calves": "calf",
+            "shelves": "shelf",
+            "thieves": "thief",
+        ]
+
+        if let irregular = irregulars[lowercased] {
+            // Preserve original casing
+            if name.first?.isUppercase == true {
+                return irregular.prefix(1).uppercased() + irregular.dropFirst()
+            }
+            return irregular
+        }
+
+        // Regex-like rules (applied in order)
+
+        // -ves -> -f (scarves -> scarf, but not all)
+        if lowercased.hasSuffix("ves") && name.count > 4 {
+            let stem = String(name.dropLast(3))
+            return stem + "f"
+        }
+
+        // -ies -> -y (categories -> category, but not "series", "species")
+        if lowercased.hasSuffix("ies") && name.count > 3 {
+            // Check if preceded by vowel (stays as -ie: movies->movie is wrong, should stay)
+            let beforeIes = name.dropLast(3)
+            if let lastChar = beforeIes.last, !"aeiou".contains(lastChar.lowercased()) {
+                return String(beforeIes) + "y"
+            }
+        }
+
+        // -oes -> -o (heroes -> hero, potatoes -> potato)
+        if lowercased.hasSuffix("oes") && name.count > 3 {
+            return String(name.dropLast(2))
+        }
+
+        // -ses, -xes, -zes, -ches, -shes -> drop -es
+        if name.count > 3 {
+            let suffixes = ["sses", "xes", "zes", "ches", "shes"]
+            for suffix in suffixes {
+                if lowercased.hasSuffix(suffix) {
+                    return String(name.dropLast(2))
+                }
+            }
+        }
+
+        // -us (status -> status, not statuse; already handled by removing trailing s)
+        // -is (analysis already in irregulars)
+
+        // Default: remove trailing -s
+        if lowercased.hasSuffix("s") && !lowercased.hasSuffix("ss") && name.count > 1 {
+            return String(name.dropLast())
+        }
+
+        return name
+    }
+}
+
+struct CodeBlockView: View {
+    let code: String
+
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Swift")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    #if os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                    #else
+                    UIPasteboard.general.string = code
+                    #endif
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        copied = false
+                    }
+                } label: {
+                    Label(copied ? "Copied!" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.3))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                highlightedCode
+                    .font(.system(.caption, design: .monospaced))
+                    .padding(12)
+            }
+        }
+        .background(Color(white: 0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var highlightedCode: Text {
+        var result = AttributedString()
+
+        let lines = code.components(separatedBy: "\n")
+        for (lineIndex, line) in lines.enumerated() {
+            if lineIndex > 0 {
+                result.append(AttributedString("\n"))
+            }
+
+            // Check if it's a comment line
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("//") {
+                var comment = AttributedString(line)
+                comment.foregroundColor = SwiftSyntaxColors.comment
+                result.append(comment)
+                continue
+            }
+
+            // Process the line token by token
+            var remaining = line[...]
+            while !remaining.isEmpty {
+                if let match = remaining.firstMatch(of: SwiftSyntaxPatterns.token) {
+                    // Add any text before the match
+                    if match.range.lowerBound > remaining.startIndex {
+                        let before = String(remaining[remaining.startIndex..<match.range.lowerBound])
+                        var beforeAttr = AttributedString(before)
+                        beforeAttr.foregroundColor = .white
+                        result.append(beforeAttr)
+                    }
+
+                    let token = String(match.output)
+                    let color = colorForToken(token)
+                    var tokenAttr = AttributedString(token)
+                    tokenAttr.foregroundColor = color
+                    result.append(tokenAttr)
+
+                    remaining = remaining[match.range.upperBound...]
+                } else {
+                    var remainingAttr = AttributedString(String(remaining))
+                    remainingAttr.foregroundColor = .white
+                    result.append(remainingAttr)
+                    break
+                }
+            }
+        }
+
+        return Text(result)
+    }
+
+    private func colorForToken(_ token: String) -> Color {
+        // Keywords
+        if SwiftSyntaxColors.keywords.contains(token) {
+            return SwiftSyntaxColors.keyword
+        }
+
+        // Types (starts with uppercase)
+        if let first = token.first, first.isUppercase, first.isLetter {
+            return SwiftSyntaxColors.type
+        }
+
+        // Strings
+        if token.hasPrefix("\"") {
+            return SwiftSyntaxColors.string
+        }
+
+        // Numbers
+        if token.first?.isNumber == true {
+            return SwiftSyntaxColors.number
+        }
+
+        // Dots and punctuation
+        if token == "." || token == "," || token == ":" || token == "(" || token == ")" ||
+           token == "[" || token == "]" || token == "{" || token == "}" {
+            return .white
+        }
+
+        return .white
+    }
+}
+
+private enum SwiftSyntaxColors {
+    static let keyword = Color(red: 0.988, green: 0.376, blue: 0.639)  // Pink
+    static let type = Color(red: 0.596, green: 0.855, blue: 0.945)     // Light blue
+    static let string = Color(red: 0.988, green: 0.416, blue: 0.365)   // Red/orange
+    static let number = Color(red: 0.816, green: 0.749, blue: 0.412)   // Yellow
+    static let comment = Color(red: 0.424, green: 0.475, blue: 0.529)  // Gray
+
+    static let keywords: Set<String> = [
+        "import", "let", "var", "func", "struct", "class", "enum", "protocol",
+        "extension", "if", "else", "for", "while", "return", "try", "await",
+        "async", "throw", "throws", "catch", "do", "guard", "switch", "case",
+        "default", "break", "continue", "static", "self", "Self", "nil", "true", "false"
+    ]
+}
+
+private enum SwiftSyntaxPatterns {
+    // Match strings, keywords, identifiers, numbers, and punctuation
+    static let token = /\"[^\"]*\"|[a-zA-Z_][a-zA-Z0-9_]*|\d+\.?\d*|[.,:;\(\)\[\]\{\}=<>!&|+\-*\/]/
+}
+
+struct QueryParam: Identifiable {
+    let id = UUID()
+    let name: String
+    let type: String
+    let description: String
 }
 
 struct SchemaFieldRow: View {
@@ -841,10 +1782,12 @@ struct RuleRow: View {
     let name: String
     let rule: String?
 
+    @ScaledMetric(relativeTo: .body) private var labelWidth: CGFloat = 60
+
     var body: some View {
         HStack(alignment: .top) {
             Text(name)
-                .frame(width: 60, alignment: .leading)
+                .frame(minWidth: labelWidth, alignment: .leading)
                 .foregroundStyle(.secondary)
 
             if let rule, !rule.isEmpty {

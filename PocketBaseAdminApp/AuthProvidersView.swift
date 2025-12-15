@@ -11,6 +11,13 @@ import PocketBaseAdmin
 
 struct AuthProvidersView: View {
     @Environment(\.pocketbase) private var pocketbase
+    @Environment(CollectionsState.self) private var collectionsState
+
+    private var authCollections: [CollectionModel] {
+        collectionsState.collections
+            .map(\.collection)
+            .filter { $0.type == .auth }
+    }
 
     private let providers: [OAuthProvider] = [
         OAuthProvider(name: "Google", icon: "g.circle.fill", color: .red),
@@ -49,6 +56,43 @@ struct AuthProvidersView: View {
                         .fill(Color.blue.opacity(0.1))
                 )
 
+                // Auth Collections
+                if !authCollections.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Your Auth Collections")
+                            .font(.headline)
+
+                        Text("Configure OAuth providers for each of your auth collections:")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(authCollections, id: \.id) { collection in
+                            Link(destination: pocketbase.url.appendingPathComponent("/_/#/collections?collectionId=\(collection.id)&tab=options")) {
+                                HStack {
+                                    Image(.auth)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 24, height: 24)
+                                    Text(collection.name)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text("Configure")
+                                        .foregroundStyle(.blue)
+                                    Image(systemName: "arrow.up.right")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.secondary.opacity(0.05))
+                                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
                 // Supported providers
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Supported Providers")
@@ -65,13 +109,13 @@ struct AuthProvidersView: View {
 
                 // Link to admin UI
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Configure in Admin UI")
+                    Text("PocketBase Admin")
                         .font(.headline)
 
                     Link(destination: pocketbase.url.appendingPathComponent("/_/")) {
                         HStack {
                             Image(systemName: "globe")
-                            Text("Open PocketBase Admin")
+                            Text("Open PocketBase Admin Dashboard")
                             Spacer()
                             Image(systemName: "arrow.up.right")
                         }
@@ -100,12 +144,14 @@ struct OAuthProvider: Identifiable {
 struct ProviderCard: View {
     let provider: OAuthProvider
 
+    @ScaledMetric(relativeTo: .title2) private var iconSize: CGFloat = 32
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: provider.icon)
                 .font(.title2)
                 .foregroundStyle(provider.color)
-                .frame(width: 32, height: 32)
+                .frame(width: iconSize, height: iconSize)
 
             Text(provider.name)
                 .font(.caption)
