@@ -37,42 +37,35 @@ final class CollectionState: Identifiable {
         return names.isEmpty ? nil : names.joined(separator: ",")
     }
 
-    @concurrent
     func load(with pocketbase: PocketBase, sort: String? = nil) async {
+        // Capture values on main actor before async work
+        let collectionName = collection.name
+        let expandFields = relationFieldNames
+
         do {
             let newRecords = try await pocketbase.admin
-                .records(collection.name)
-                .list(page: page, sort: sort, expand: relationFieldNames)
+                .records(collectionName)
+                .list(page: page, sort: sort, expand: expandFields)
                 .items
-            await MainActor.run {
-                records = newRecords
-                retryCount = 0
-            }
+            records = newRecords
+            retryCount = 0
         } catch {
             let nsError = error as NSError
 
             if nsError.domain == NSURLErrorDomain,
                nsError.code == NSURLErrorCancelled {
-                await MainActor.run {
-                    retryCount += 1
-                }
+                retryCount += 1
                 try? await Task.sleep(for: .seconds(1))
-                await MainActor.run {
-                    if retryCount >= maxRetryCount {
-                        retryCount = 0
-                        logger.error("Failed to load records after \(self.maxRetryCount) retries: \(String(describing: error))")
-                        return
-                    }
-                    logger.info("Retrying to load records... (Attempt \(self.retryCount)/\(self.maxRetryCount))")
-                }
-                if await retryCount != 0 {
-                    await load(with: pocketbase, sort: sort)
-                }
-            } else {
-                await MainActor.run {
-                    logger.error("Failed to load records: \(String(describing: error))")
+                if retryCount >= maxRetryCount {
                     retryCount = 0
+                    logger.error("Failed to load records after \(self.maxRetryCount) retries: \(String(describing: error))")
+                    return
                 }
+                logger.info("Retrying to load records... (Attempt \(self.retryCount)/\(self.maxRetryCount))")
+                await load(with: pocketbase, sort: sort)
+            } else {
+                logger.error("Failed to load records: \(String(describing: error))")
+                retryCount = 0
             }
         }
     }
