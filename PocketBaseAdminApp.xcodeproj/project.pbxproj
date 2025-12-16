@@ -115,15 +115,7 @@
 		035DA1DF2EEF3CA5003225F0 /* Exceptions for "PocketBaseWidgets" folder in "PocketBaseWidgetsExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				BackupStatusWidget.swift,
-				CollectionsListWidget.swift,
-				ErrorCountWidget.swift,
 				Info.plist,
-				QuickActionsWidget.swift,
-				RecentLogsWidget.swift,
-				ServerStatusWidget.swift,
-				StatsWidget.swift,
-				WidgetBundle.swift,
 			);
 			target = 035DA1CB2EEF3CA3003225F0 /* PocketBaseWidgetsExtension */;
 		};

@@ -9,6 +9,7 @@ import SwiftUI
 import PocketBase
 import PocketBaseAdmin
 import UniformTypeIdentifiers
+import PhotosUI
 
 struct RecordEditorView: View {
     let collection: CollectionModel
@@ -458,6 +459,11 @@ struct FileFieldEditor: View {
     @Binding var value: JSONValue
     @Binding var showFilePicker: Bool
     @Binding var selectedFileName: String?
+    var onFileSelected: ((Data, String) -> Void)?
+
+    @State private var showPhotosPicker = false
+    @State private var showCamera = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     private var currentFileName: String? {
         switch value {
@@ -471,6 +477,14 @@ struct FileFieldEditor: View {
         default:
             return nil
         }
+    }
+
+    /// Check if the field accepts images
+    private var acceptsImages: Bool {
+        guard let mimeTypes = field.options?.mimeTypes, !mimeTypes.isEmpty else {
+            return true // No restrictions, accept images
+        }
+        return mimeTypes.contains { $0.hasPrefix("image/") || $0 == "image/*" }
     }
 
     var body: some View {
@@ -498,12 +512,54 @@ struct FileFieldEditor: View {
                 )
             }
 
-            Button {
-                showFilePicker = true
+            Menu {
+                #if os(iOS)
+                if acceptsImages {
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label("Take Photo", systemImage: "camera")
+                    }
+
+                    Button {
+                        showPhotosPicker = true
+                    } label: {
+                        Label("Photo Library", systemImage: "photo.on.rectangle")
+                    }
+                }
+                #endif
+
+                Button {
+                    showFilePicker = true
+                } label: {
+                    Label("Browse Files", systemImage: "folder")
+                }
             } label: {
-                Label("Choose File", systemImage: "folder")
+                Label("Choose File", systemImage: "plus.circle")
             }
             .buttonStyle(.bordered)
+            .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPhotoItem, matching: .images)
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self) {
+                        let fileName = "photo_\(Date().timeIntervalSince1970).jpg"
+                        selectedFileName = fileName
+                        onFileSelected?(data, fileName)
+                    }
+                }
+            }
+            #if os(iOS)
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraView { image in
+                    if let data = image.jpegData(compressionQuality: 0.8) {
+                        let fileName = "photo_\(Date().timeIntervalSince1970).jpg"
+                        selectedFileName = fileName
+                        onFileSelected?(data, fileName)
+                    }
+                }
+            }
+            #endif
 
             if let maxSize = field.options?.maxSize {
                 Text("Max size: \(ByteCountFormatter.string(fromByteCount: Int64(maxSize), countStyle: .file))")
@@ -519,6 +575,49 @@ struct FileFieldEditor: View {
         }
     }
 }
+
+// MARK: - Camera View
+
+#if os(iOS)
+import UIKit
+
+struct CameraView: UIViewControllerRepresentable {
+    var onCapture: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraView
+
+        init(_ parent: CameraView) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onCapture(image)
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
+#endif
 
 // MARK: - Relation Field Editor
 
