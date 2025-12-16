@@ -37,6 +37,7 @@ struct PocketBaseAdminApp: App {
         .defaultSize(width: 1200, height: 800)
 #endif
         .commands {
+            AppCommands()
             InspectorCommands()
             SidebarCommands()
             ToolbarCommands()
@@ -57,7 +58,7 @@ struct AdminRootView: View {
             if isCheckingAuth {
                 ProgressView("Checking authentication...")
             } else if isAuthenticated {
-                ContentView()
+                ContentView(onLogout: logout)
             } else {
                 AdminLoginView {
                     isAuthenticated = true
@@ -66,15 +67,6 @@ struct AdminRootView: View {
         }
         .task {
             await checkAuthentication()
-        }
-        .onChange(of: pocketbase.authStore.isValid) { _, isValid in
-            isAuthenticated = isValid
-            // Re-sync intent configuration when auth changes
-            if isValid {
-                Task {
-                    await syncIntentConfiguration()
-                }
-            }
         }
     }
 
@@ -91,6 +83,11 @@ struct AdminRootView: View {
         if isAuthenticated {
             await BackgroundTaskManager.shared.requestNotificationPermissions()
         }
+    }
+
+    private func logout() {
+        pocketbase.authStore.clear()
+        isAuthenticated = false
     }
 
     private func syncIntentConfiguration() async {

@@ -19,137 +19,212 @@ struct AdminLoginView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var needsInitialSetup = false
-    @State private var installerToken: String?
 
     let onAuthenticated: () -> Void
 
+    private var backgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+
     var body: some View {
-        NavigationStack {
-            Form {
-                if needsInitialSetup {
-                    initialSetupSection
-                } else {
-                    loginSection
+        ZStack {
+            // Background
+            backgroundColor
+                .ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                // Logo and title
+                VStack(spacing: 16) {
+                    Image(.base)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
+                        .padding(20)
+                        .background {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        }
+
+                    Text("PocketBase Admin")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+
+                    Text("Sign in to manage your server")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+
+                // Login form
+                VStack(spacing: 20) {
+                    if needsInitialSetup {
+                        initialSetupCard
+                    } else {
+                        loginCard
+                    }
+                }
+                .frame(maxWidth: 360)
+
+                Spacer()
+                Spacer()
             }
-            .navigationTitle("Admin Login")
-            .task {
-                await checkAdminStatus()
-            }
+            .padding(40)
+        }
+        .task {
+            await checkAdminStatus()
         }
     }
 
     @ViewBuilder
-    private var loginSection: some View {
-        Section {
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                #endif
+    private var loginCard: some View {
+        VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Email")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                TextField("admin@example.com", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                    .textContentType(.emailAddress)
+                    .autocorrectionDisabled()
+            }
 
-            SecureField("Password", text: $password)
-                .textContentType(.password)
-        } header: {
-            Text("Admin Credentials")
-        } footer: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                SecureField("••••••••", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                    .textContentType(.password)
+                    .onSubmit {
+                        if !email.isEmpty && !password.isEmpty {
+                            Task { await login() }
+                        }
+                    }
+            }
+
             if let errorMessage {
                 Text(errorMessage)
+                    .font(.caption)
                     .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
 
-        Section {
             Button {
-                Task {
-                    await login()
-                }
+                Task { await login() }
             } label: {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Login")
-                        .frame(maxWidth: .infinity)
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Sign In")
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 20)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .disabled(email.isEmpty || password.isEmpty || isLoading)
-        }
 
-        Section {
             Text("Admin accounts can only be created by existing admins or during initial setup.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
+        }
+        .padding(24)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.regularMaterial)
         }
     }
 
     @ViewBuilder
-    private var initialSetupSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Initial Setup Required", systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline)
+    private var initialSetupCard: some View {
+        VStack(spacing: 16) {
+            // Warning banner
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title2)
                     .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Initial Setup Required")
+                        .font(.headline)
+                    Text("Create the first admin account to get started.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.orange.opacity(0.1))
+            }
 
-                Text("No admin account exists yet. Create the first admin account to get started.")
-                    .font(.callout)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Email")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                TextField("admin@example.com", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                    .textContentType(.emailAddress)
+                    .autocorrectionDisabled()
             }
-            .padding(.vertical, 8)
-        }
 
-        Section("Create First Admin") {
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                #endif
-
-            SecureField("Password", text: $password)
-                .textContentType(.newPassword)
-        }
-
-        Section {
-            Button {
-                Task {
-                    await createFirstAdmin()
-                }
-            } label: {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Text("Create Admin Account")
-                        .frame(maxWidth: .infinity)
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                SecureField("Minimum 8 characters", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                    .textContentType(.newPassword)
             }
-            .disabled(email.isEmpty || password.count < 8 || isLoading)
-        } footer: {
-            Text("Password must be at least 8 characters.")
-                .font(.caption)
-        }
 
-        if let errorMessage {
-            Section {
+            if let errorMessage {
                 Text(errorMessage)
+                    .font(.caption)
                     .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            Button {
+                Task { await createFirstAdmin() }
+            } label: {
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text("Create Admin Account")
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 20)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(email.isEmpty || password.count < 8 || isLoading)
+        }
+        .padding(24)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.regularMaterial)
         }
     }
 
     private func checkAdminStatus() async {
-        // Check if any admins exist by trying to list auth methods
         do {
             let collection = pocketbase.collection(Superuser.self)
             _ = try await collection.listAuthMethods()
             needsInitialSetup = false
         } catch {
-            // If we get a 404 or specific error, might need setup
-            // For now, assume login is available
             needsInitialSetup = false
         }
     }
@@ -177,10 +252,8 @@ struct AdminLoginView: View {
         defer { isLoading = false }
 
         do {
-            // Create first admin via the _superusers collection
             let collection = pocketbase.collection(Superuser.self)
 
-            // First try to create the admin
             let newAdmin = Superuser(
                 email: email,
                 verified: true,
@@ -193,7 +266,6 @@ struct AdminLoginView: View {
                 passwordConfirm: password
             )
 
-            // Then login with the new credentials
             _ = try await collection.authWithPassword(
                 email,
                 password: password

@@ -455,12 +455,23 @@ private struct LogsTableSection: View {
     @Bindable var state: LogsState
     @Binding var selectedLogs: Set<LogModel.ID>
     var horizontalSizeClass: UserInterfaceSizeClass?
-    
+
     var body: some View {
         if horizontalSizeClass == .compact {
             // Use List for compact layouts (mobile)
             List(state.logs, selection: $selectedLogs) { log in
                 CompactLogRow(log: log)
+                    .contextMenu {
+                        LogMenuContent(
+                            log: log,
+                            onFilterByLevel: { level in
+                                state.selectedLogLevels = [level]
+                            },
+                            onFilterByURL: { url in
+                                state.searchQuery = url
+                            }
+                        )
+                    }
             }
         } else {
             // Use Table for regular layouts (desktop/tablet)
@@ -475,20 +486,34 @@ private struct LogsTableSection: View {
                         .cornerRadius(4)
                 }
                 .width(min: 80, ideal: 100, max: 120)
-                
+
                 TableColumn("Message") { log in
                     Text(log.message)
                         .lineLimit(2)
                         .font(.system(.caption, design: .monospaced))
                 }
                 .width(min: 200, ideal: 400)
-                
+
                 TableColumn("Created") { log in
                     Text(log.created, format: .dateTime)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .width(min: 140, ideal: 160, max: 180)
+            }
+            .contextMenu(forSelectionType: LogModel.ID.self) { selectedIds in
+                if let logId = selectedIds.first,
+                   let log = state.logs.first(where: { $0.id == logId }) {
+                    LogMenuContent(
+                        log: log,
+                        onFilterByLevel: { level in
+                            state.selectedLogLevels = [level]
+                        },
+                        onFilterByURL: { url in
+                            state.searchQuery = url
+                        }
+                    )
+                }
             }
         }
     }

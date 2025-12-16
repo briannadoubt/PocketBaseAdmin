@@ -90,10 +90,29 @@ struct CollectionView: View {
     @State private var selectedRecords: Set<RecordModel.ID> = []
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
-    @State private var showRecordEditor = false
-    @State private var editingRecord: RecordModel? = nil
+    @State private var recordEditorMode: RecordEditorMode? = nil
     @State private var showCollectionEditor = false
     @State private var isDeletingCollection = false
+
+    /// Mode for the record editor sheet
+    enum RecordEditorMode: Identifiable {
+        case new
+        case edit(RecordModel)
+
+        var id: String {
+            switch self {
+            case .new: return "new-record"
+            case .edit(let record): return "edit-\(record.id)"
+            }
+        }
+
+        var record: RecordModel? {
+            switch self {
+            case .new: return nil
+            case .edit(let record): return record
+            }
+        }
+    }
 
     private var selectedRecordModel: RecordModel? {
         state.records.first { $0.id == selectedRecords.first }
@@ -108,13 +127,26 @@ struct CollectionView: View {
         return hasCreatedKey ? "-created" : nil
     }
 
+    /// Presentable fields to show in compact card view (limit to first few meaningful fields)
+    private var presentableFields: [Field] {
+        let fields = schema.filter { field in
+            // Prioritize presentable fields, then text/email fields
+            field.presentable == true ||
+            field.type == .text ||
+            field.type == .email ||
+            field.type == .select
+        }
+        return Array(fields.prefix(3))
+    }
+
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dismiss) private var dismiss
     @Environment(CollectionsState.self) private var collectionsState
     
     @State private var selectedInpector: InspectorTab? = .api
-    
+    @State private var showInspectorSheet = false
+
     enum InspectorTab: String, CaseIterable, Identifiable {
         case record
         case schema
@@ -132,21 +164,139 @@ struct CollectionView: View {
                 "Schema"
             }
         }
+
+        var icon: String {
+            switch self {
+            case .api:
+                "curlybraces"
+            case .record:
+                "doc.text"
+            case .schema:
+                "list.bullet.rectangle"
+            }
+        }
     }
-    
-    var body: some View {
-        Table(state.records, selection: $selectedRecords) {
-            if horizontalSizeClass == .compact {
-                TableColumn("Compact") { record in
-                    CompactRecordRow(
-                        schema: schema,
-                        record: record,
-                        collectionsState: collectionsState
+
+    // MARK: - Inspector Content
+
+    @ViewBuilder
+    private var inspectorContent: some View {
+        VStack(spacing: 0) {
+            Picker(
+                selection: Binding {
+                    selectedInpector ?? .record
+                } set: { inspector, _ in
+                    self.selectedInpector = inspector
+                }
+            ) {
+                ForEach(InspectorTab.allCases) { tab in
+                    Label(tab.title, systemImage: tab.icon).tag(tab)
+                }
+            } label: {
+                EmptyView()
+            }
+            .pickerStyle(.segmented)
+            .padding()
+
+            Group {
+                switch selectedInpector {
+                case .record:
+                    if
+                        let selectedRecordModel,
+                        let record = state.records.first(
+                            where: { $0.id == selectedRecordModel.id }
+                        )
+                    {
+                        RecordInspectorView(record: record, schema: schema, collectionsState: collectionsState) { recordToEdit in
+                            recordEditorMode = .edit(recordToEdit)
+                        }
+                    } else {
+                        ContentUnavailableView(
+                            "No record selected",
+                            systemImage: "doc"
+                        )
+                    }
+                case .schema:
+                    SchemaInspectorView(
+                        collection: state.collection,
+                        onEdit: {
+                            showCollectionEditor = true
+                        },
+                        onDelete: {
+                            Task {
+                                await deleteCollection()
+                            }
+                        }
+                    )
+                case .api:
+                    SwiftAPIPreviewView(collection: state.collection)
+                case nil:
+                    ContentUnavailableView(
+                        "Select an inspector tab",
+                        systemImage: "sidebar.trailing"
                     )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
 
-            // These are implicitely ignored when rendered with compact horizontal size class
+    // MARK: - Compact Layout (iOS)
+
+    @ViewBuilder
+    private var compactRecordsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if state.records.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Records", systemImage: "doc")
+                    } description: {
+                        Text("This collection is empty. Tap + to create a record.")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 100)
+                } else {
+                    ForEach(state.records) { record in
+                        RecordCardView(
+                            record: record,
+                            schema: schema,
+                            presentableFields: presentableFields,
+                            collectionsState: collectionsState,
+                            onEdit: {
+                                recordEditorMode = .edit(record)
+                            }
+                        )
+                        .contextMenu {
+                            RecordMenuContent(
+                                record: record,
+                                schema: schema,
+                                collectionName: state.collection.name,
+                                onEdit: {
+                                    recordEditorMode = .edit(record)
+                                },
+                                onDuplicate: {
+                                    duplicateRecord(record)
+                                },
+                                onDelete: {
+                                    selectedRecords = Set([record.id])
+                                    showDeleteConfirmation = true
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Regular Layout (macOS/iPad)
+
+    @ViewBuilder
+    private var regularTable: some View {
+        Table(state.records, selection: $selectedRecords) {
             TableColumn("id") { record in
                 FieldView(
                     field: Field(
@@ -160,11 +310,49 @@ struct CollectionView: View {
                     collectionsState: collectionsState
                 )
             }
+            .width(min: 80, ideal: 120, max: 200)
 
             TableColumnForEach(schema, id: \.id) { field in
                 TableColumn(field.name) { record in
                     FieldView(field: field, record: record, collectionsState: collectionsState)
                 }
+                .width(min: 80, ideal: columnWidth(for: field), max: 300)
+            }
+        }
+        .contextMenu(forSelectionType: RecordModel.ID.self) { selectedIds in
+            if let recordId = selectedIds.first,
+               let record = state.records.first(where: { $0.id == recordId }) {
+                RecordMenuContent(
+                    record: record,
+                    schema: schema,
+                    collectionName: state.collection.name,
+                    onEdit: {
+                        recordEditorMode = .edit(record)
+                    },
+                    onDuplicate: {
+                        duplicateRecord(record)
+                    },
+                    onDelete: {
+                        selectedRecords = Set([record.id])
+                        showDeleteConfirmation = true
+                    }
+                )
+            }
+        } primaryAction: { selectedIds in
+            // Double-click to edit
+            if let recordId = selectedIds.first,
+               let record = state.records.first(where: { $0.id == recordId }) {
+                recordEditorMode = .edit(record)
+            }
+        }
+    }
+
+    var body: some View {
+        Group {
+            if horizontalSizeClass == .compact {
+                compactRecordsList
+            } else {
+                regularTable
             }
         }
         .refreshable { [state = state, pocketbase = pocketbase, sort = sort] in
@@ -178,68 +366,31 @@ struct CollectionView: View {
         .searchable(text: $state.searchQuery)
         .inspector(
             isPresented: Binding(
-                get: { self.selectedInpector != nil },
+                get: { horizontalSizeClass != .compact && self.selectedInpector != nil },
                 set: { _ in })
         ) {
-            VStack(spacing: 0) {
-                Picker(
-                    selection: Binding {
-                        selectedInpector ?? .record
-                    } set: { inspector, _ in
-                        self.selectedInpector = inspector
-                    }
-                ) {
-                    ForEach(InspectorTab.allCases) { tab in
-                        Text(tab.title).tag(tab)
-                    }
-                } label: {
-                    EmptyView()
-                }
-                .padding()
-
-                Group {
-                    switch selectedInpector {
-                    case .record:
-                        if
-                            let selectedRecordModel,
-                            let record = state.records.first(
-                                where: { $0.id == selectedRecordModel.id }
-                            )
-                        {
-                            RecordInspectorView(record: record, schema: schema, collectionsState: collectionsState) { recordToEdit in
-                                editingRecord = recordToEdit
-                                showRecordEditor = true
+            inspectorContent
+                .inspectorColumnWidth(min: 300, ideal: 400, max: 600)
+        }
+        .sheet(isPresented: $showInspectorSheet) {
+            NavigationStack {
+                inspectorContent
+                    .navigationTitle("Inspector")
+                    #if !os(macOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                showInspectorSheet = false
                             }
-                        } else {
-                            ContentUnavailableView(
-                                "No record selected",
-                                systemImage: "doc"
-                            )
                         }
-                    case .schema:
-                        SchemaInspectorView(
-                            collection: state.collection,
-                            onEdit: {
-                                showCollectionEditor = true
-                            },
-                            onDelete: {
-                                Task {
-                                    await deleteCollection()
-                                }
-                            }
-                        )
-                    case .api:
-                        SwiftAPIPreviewView(collection: state.collection)
-                    case nil:
-                        ContentUnavailableView(
-                            "What the heck are you even doing?? Get a life.",
-                            systemImage: "questionmark"
-                        )
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .inspectorColumnWidth(min: 300, ideal: 400, max: 600)
+            #if !os(macOS)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            #endif
         }
         .toolbar {
 #if !os(macOS)
@@ -265,8 +416,7 @@ struct CollectionView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    editingRecord = nil
-                    showRecordEditor = true
+                    recordEditorMode = .new
                 } label: {
                     Label("New Record", systemImage: "doc.badge.plus")
                 }
@@ -274,10 +424,14 @@ struct CollectionView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    if selectedInpector == nil {
-                        selectedInpector = .api
+                    if horizontalSizeClass == .compact {
+                        showInspectorSheet = true
                     } else {
-                        selectedInpector = nil
+                        if selectedInpector == nil {
+                            selectedInpector = .api
+                        } else {
+                            selectedInpector = nil
+                        }
                     }
                 } label: {
                     Label("Inspector", systemImage: "sidebar.trailing")
@@ -297,10 +451,10 @@ struct CollectionView: View {
         } message: {
             Text("This action cannot be undone.")
         }
-        .sheet(isPresented: $showRecordEditor) {
+        .sheet(item: $recordEditorMode) { mode in
             RecordEditorView(
                 collection: state.collection,
-                record: editingRecord,
+                record: mode.record,
                 onSave: { [state = state, pocketbase = pocketbase, sort = sort] in
                     await state.load(with: pocketbase, sort: sort)
                 }
@@ -313,6 +467,16 @@ struct CollectionView: View {
                     state.collection = updatedCollection
                 }
             )
+        }
+        .focusedValue(\.selectedRecord, selectedRecordModel)
+        .focusedValue(\.selectedCollection, state.collection)
+        .onReceive(NotificationCenter.default.publisher(for: .newRecord)) { _ in
+            recordEditorMode = .new
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refresh)) { _ in
+            Task {
+                await state.load(with: pocketbase, sort: sort)
+            }
         }
     }
 
@@ -352,25 +516,215 @@ struct CollectionView: View {
             state.logger.error("Failed to delete collection: \(error)")
         }
     }
+
+    private func duplicateRecord(_ record: RecordModel) {
+        // Open the record editor with the record data for duplication
+        // The editor will create a new record when saved (uses record content but creates new)
+        recordEditorMode = .edit(record)
+    }
+
+    /// Returns ideal column width based on field type
+    private func columnWidth(for field: Field) -> CGFloat {
+        switch field.type {
+        case .text, .editor:
+            return 200
+        case .number:
+            return 100
+        case .bool:
+            return 80
+        case .email, .customEmail:
+            return 180
+        case .url:
+            return 200
+        case .date, .dateTime, .autodate:
+            return 160
+        case .select:
+            return 120
+        case .json:
+            return 200
+        case .file:
+            return 150
+        case .relation:
+            return 150
+        case .password:
+            return 120
+        case .primaryKey:
+            return 120
+        case .geoPoint:
+            return 150
+        case .unknown:
+            return 150
+        }
+    }
+
 }
 
-struct CompactRecordRow: View {
-    var schema: [Field]
-    var record: RecordModel
+/// Card-style view for displaying a record on compact layouts (iOS)
+struct RecordCardView: View {
+    let record: RecordModel
+    let schema: [Field]
+    let presentableFields: [Field]
     var collectionsState: CollectionsState?
+    var onEdit: (() -> Void)?
+
+    @State private var isExpanded = false
+
+    /// Get summary fields to show in collapsed state (prioritize presentable fields)
+    private var summaryFields: [(String, String)] {
+        var results: [(String, String)] = []
+
+        // First try presentable fields
+        for field in presentableFields.prefix(2) {
+            if let value = record.content[field.name], !isEmptyValue(value) {
+                results.append((field.name, stringValue(from: value)))
+            }
+        }
+
+        // If no presentable fields, try common field names
+        if results.isEmpty {
+            for fieldName in ["name", "title", "label", "email", "username"] {
+                if let value = record.content[fieldName], !isEmptyValue(value) {
+                    results.append((fieldName, stringValue(from: value)))
+                    break
+                }
+            }
+        }
+
+        return results
+    }
+
+    /// All displayable fields for expanded view
+    private var allFields: [(String, String)] {
+        var results: [(String, String)] = []
+
+        // Add ID first
+        results.append(("id", record.id))
+
+        // Add schema fields
+        for field in schema {
+            if let value = record.content[field.name] {
+                results.append((field.name, stringValue(from: value)))
+            }
+        }
+
+        // Add created/updated if available
+        if let created = record.created {
+            results.append(("created", created.formatted(date: .numeric, time: .omitted)))
+        }
+
+        return results
+    }
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack {
-                ForEach(schema, id: \.name) { field in
-                    VStack(alignment: .leading) {
-                        FieldView(field: field, record: record, collectionsState: collectionsState)
-                        Text(field.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header - always visible
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("id: \(record.id)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+
+                        if !summaryFields.isEmpty {
+                            HStack(spacing: 12) {
+                                ForEach(summaryFields, id: \.0) { name, value in
+                                    Text("\(name): \(value)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .lineLimit(1)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded content
+            if isExpanded {
+                Divider()
+                    .padding(.vertical, 8)
+
+                VStack(spacing: 8) {
+                    ForEach(allFields, id: \.0) { name, value in
+                        HStack(alignment: .top) {
+                            Text(name)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 80, alignment: .leading)
+
+                            Spacer()
+
+                            Text(value)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+
+                    if let onEdit {
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        Button {
+                            onEdit()
+                        } label: {
+                            Label("Edit Record", systemImage: "pencil")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
             }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+        )
+    }
+
+    private func isEmptyValue(_ value: JSONValue) -> Bool {
+        switch value {
+        case .null: return true
+        case .string(let str): return str.isEmpty
+        case .array(let arr): return arr.isEmpty
+        default: return false
+        }
+    }
+
+    private func stringValue(from value: JSONValue) -> String {
+        switch value {
+        case .string(let str): return str
+        case .int(let num): return String(num)
+        case .double(let num): return num.formatted(.number.precision(.fractionLength(0...2)))
+        case .bool(let bool): return bool ? "Yes" : "No"
+        case .date(let date): return date.formatted(date: .numeric, time: .omitted)
+        case .array(let arr): return "[\(arr.count) items]"
+        case .dictionary: return "{...}"
+        case .null: return "-"
+        case .url(let url): return url.absoluteString
+        case .decimal(let dec): return "\(dec)"
         }
     }
 }
@@ -649,7 +1003,9 @@ struct FieldView: View {
                 } else {
                     JSONValueView(value: fieldValue)
                 }
-            case .geoPoint, .unknown:
+            case .geoPoint:
+                JSONValueView(value: fieldValue)
+            case .unknown:
                 JSONValueView(value: fieldValue)
             }
         }
@@ -1320,7 +1676,9 @@ struct SwiftAPIPreviewView: View {
             return "[String: Any]?"
         case .password, .customEmail:
             return "String?"
-        case .primaryKey, .unknown:
+        case .primaryKey:
+            return "String?"
+        case .unknown:
             return "String?"
         }
     }
@@ -1348,7 +1706,9 @@ struct SwiftAPIPreviewView: View {
             return "Date()"
         case .file, .relation, .json, .geoPoint:
             return "nil"
-        case .password, .customEmail, .primaryKey, .unknown:
+        case .password, .customEmail, .primaryKey:
+            return "nil"
+        case .unknown:
             return "nil"
         }
     }

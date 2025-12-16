@@ -28,8 +28,21 @@ struct RecordEditorView: View {
         collection.schema ?? []
     }
 
+    /// Fields that should not be editable in the record editor
+    private static let systemFieldNames: Set<String> = [
+        "id", "created", "updated", "collectionId", "collectionName", "expand"
+    ]
+
     private var editableFields: [Field] {
-        schema.filter { !$0.system }
+        schema.filter { field in
+            // Skip system fields
+            guard !field.system else { return false }
+            // Skip known system field names
+            guard !Self.systemFieldNames.contains(field.name) else { return false }
+            // Skip autodate fields (auto-managed by PocketBase)
+            guard field.type != .autodate else { return false }
+            return true
+        }
     }
 
     var body: some View {
@@ -160,7 +173,9 @@ struct RecordEditorView: View {
             return .null
         case .customEmail:
             return .string("")
-        case .primaryKey, .unknown:
+        case .primaryKey:
+            return .string("")
+        case .unknown:
             return .string("")
         }
     }
@@ -205,54 +220,57 @@ struct FieldEditorRow: View {
     var body: some View {
         switch field.type {
         case .text:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("Enter \(field.name)"))
         case .editor:
             TextEditor(text: stringBinding)
                 .frame(minHeight: 100)
         case .number:
-            TextField(field.name, value: numberBinding, format: .number)
+            TextField("", value: numberBinding, format: .number, prompt: Text("0"))
             #if os(iOS)
                 .keyboardType(.decimalPad)
             #endif
         case .bool:
-            Toggle(field.name, isOn: boolBinding)
+            Toggle("Enabled", isOn: boolBinding)
         case .email:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("email@example.com"))
             #if os(iOS)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
                 .autocapitalization(.none)
             #endif
         case .url:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("https://"))
             #if os(iOS)
                 .keyboardType(.URL)
                 .textContentType(.URL)
                 .autocapitalization(.none)
             #endif
         case .password:
-            SecureField(field.name, text: stringBinding)
+            SecureField("", text: stringBinding, prompt: Text("Password"))
         case .date:
             DatePicker(
-                field.name,
+                "",
                 selection: dateBinding,
                 displayedComponents: .date
             )
+            .labelsHidden()
         case .dateTime, .autodate:
             DatePicker(
-                field.name,
+                "",
                 selection: dateBinding,
                 displayedComponents: [.date, .hourAndMinute]
             )
+            .labelsHidden()
         case .select:
             if let options = field.options?.values, !options.isEmpty {
-                Picker(field.name, selection: stringBinding) {
+                Picker("", selection: stringBinding) {
                     ForEach(options, id: \.self) { option in
                         Text(option).tag(option)
                     }
                 }
+                .labelsHidden()
             } else {
-                TextField(field.name, text: stringBinding)
+                TextField("", text: stringBinding, prompt: Text("Enter value"))
             }
         case .json:
             TextEditor(text: jsonStringBinding)
@@ -290,12 +308,12 @@ struct FieldEditorRow: View {
                 }
             }
         case .customEmail:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("email@example.com"))
             #if os(iOS)
                 .keyboardType(.emailAddress)
             #endif
         case .primaryKey:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("ID"))
                 .font(.system(.body, design: .monospaced))
                 .disabled(true)
         case .geoPoint:
@@ -303,7 +321,7 @@ struct FieldEditorRow: View {
                 .frame(minHeight: 60)
                 .font(.system(.body, design: .monospaced))
         case .unknown:
-            TextField(field.name, text: stringBinding)
+            TextField("", text: stringBinding, prompt: Text("Enter value"))
         }
     }
 

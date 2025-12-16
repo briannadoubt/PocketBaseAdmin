@@ -36,6 +36,8 @@ struct NavigationGroup: View {
 }
 
 struct ContentView: View {
+    var onLogout: (() -> Void)?
+
     @State private var collectionsState = CollectionsState()
     @State private var settings = Admin.Settings()
 
@@ -46,6 +48,10 @@ struct ContentView: View {
 
     @State private var selectedTab: String?
     @State private var showNewCollectionSheet = false
+    @State private var showLogoutConfirmation = false
+    @State private var collectionToEdit: CollectionModel?
+    @State private var collectionToDelete: CollectionModel?
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -70,6 +76,39 @@ struct ContentView: View {
                                 .symbolEffect(.rotate, isActive: true)
                         }
                     }
+                    if let error = collectionsState.error {
+                        Tab(value: "error") {
+                            ContentUnavailableView {
+                                Label("Failed to Load Collections", systemImage: "exclamationmark.triangle")
+                            } description: {
+                                Text(error)
+                            } actions: {
+                                Button("Retry") {
+                                    Task {
+                                        await collectionsState.load(from: pocketbase)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label("Error", systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.red)
+                        }
+                    } else if !collectionsState.isLoading && collectionsState.userCollections.isEmpty {
+                        Tab(value: "no-collections") {
+                            ContentUnavailableView {
+                                Label("No Collections", systemImage: "folder")
+                            } description: {
+                                Text("Create your first collection to get started.")
+                            } actions: {
+                                Button("New Collection") {
+                                    showNewCollectionSheet = true
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                        } label: {
+                            Label("No Collections", systemImage: "folder")
+                        }
+                    }
                     ForEach(collectionsState.userCollections) { state in
                         Tab(value: state.collection.id) {
                             NavigationStack {
@@ -82,6 +121,21 @@ struct ContentView: View {
                                 Image(state.collection.type.image)
                                     .resizable()
                                     .scaledToFit()
+                            }
+                            .contextMenu {
+                                CollectionMenuContent(
+                                    collection: state.collection,
+                                    onEdit: {
+                                        collectionToEdit = state.collection
+                                    },
+                                    onDuplicate: {
+                                        duplicateCollection(state.collection)
+                                    },
+                                    onDelete: {
+                                        collectionToDelete = state.collection
+                                        showDeleteConfirmation = true
+                                    }
+                                )
                             }
                         }
                         .customizationID(state.collection.id)
@@ -108,6 +162,21 @@ struct ContentView: View {
                                 Image(state.collection.type.image)
                                     .resizable()
                                     .scaledToFit()
+                            }
+                            .contextMenu {
+                                CollectionMenuContent(
+                                    collection: state.collection,
+                                    onEdit: {
+                                        collectionToEdit = state.collection
+                                    },
+                                    onDuplicate: {
+                                        duplicateCollection(state.collection)
+                                    },
+                                    onDelete: {
+                                        collectionToDelete = state.collection
+                                        showDeleteConfirmation = true
+                                    }
+                                )
                             }
                         }
                         .customizationID(state.collection.id)
@@ -258,6 +327,22 @@ struct ContentView: View {
             }
             .buttonStyle(.borderless)
         }
+        .tabViewSidebarFooter {
+            Button(role: .destructive) {
+                showLogoutConfirmation = true
+            } label: {
+                Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+            .buttonStyle(.borderless)
+        }
+        .confirmationDialog("Log Out", isPresented: $showLogoutConfirmation) {
+            Button("Log Out", role: .destructive) {
+                onLogout?()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to log out?")
+        }
         .task {
             await collectionsState.load(from: pocketbase)
         }
@@ -279,8 +364,60 @@ struct ContentView: View {
                 }
             )
         }
+        .sheet(item: $collectionToEdit) { collection in
+            CollectionEditorView(
+                collection: collection,
+                onSave: { updatedCollection in
+                    collectionsState.updateCollection(updatedCollection)
+                }
+            )
+        }
+        .alert("Delete Collection?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                collectionToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let collection = collectionToDelete {
+                    Task {
+                        try? await collectionsState.delete(id: collection.id, using: pocketbase)
+                        collectionToDelete = nil
+                    }
+                }
+            }
+        } message: {
+            if let collection = collectionToDelete {
+                Text("Are you sure you want to delete \"\(collection.name)\"? This will permanently delete all records in this collection. This action cannot be undone.")
+            }
+        }
         .environment(collectionsState)
         .environment(settings)
+        .focusedValue(\.collectionsState, collectionsState)
+        .focusedValue(\.pocketbase, pocketbase)
+        .focusedValue(\.selectedCollection, selectedCollectionModel)
+        .onChange(of: collectionsState.authExpired) { _, expired in
+            if expired {
+                onLogout?()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newCollection)) { _ in
+            showNewCollectionSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refresh)) { _ in
+            Task {
+                await collectionsState.load(from: pocketbase)
+            }
+        }
+    }
+
+    /// Currently selected collection based on selectedTab
+    private var selectedCollectionModel: CollectionModel? {
+        collectionsState.collections.first { $0.collection.id == selectedTab }?.collection
+    }
+
+    private func duplicateCollection(_ collection: CollectionModel) {
+        // Open the collection editor with the collection as a template
+        // User will need to change the name since it's a new collection
+        collectionToEdit = collection
     }
 }
 

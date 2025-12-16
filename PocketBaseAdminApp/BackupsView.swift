@@ -84,6 +84,24 @@ struct BackupsView: View {
                                     showDeleteConfirmation = true
                                 }
                             )
+                            .contextMenu {
+                                BackupMenuContent(
+                                    backup: backup,
+                                    onDownload: {
+                                        Task {
+                                            await downloadBackup(backup)
+                                        }
+                                    },
+                                    onRestore: {
+                                        backupToRestore = backup
+                                        showRestoreConfirmation = true
+                                    },
+                                    onDelete: {
+                                        backupToDelete = backup
+                                        showDeleteConfirmation = true
+                                    }
+                                )
+                            }
 
                             if backup.id != backups.last?.id {
                                 Divider()

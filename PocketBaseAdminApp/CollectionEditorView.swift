@@ -54,8 +54,8 @@ struct CollectionEditorView: View {
                     }
                 }
 
-                Section("Collection Info") {
-                    TextField("Name", text: $name)
+                Section {
+                    TextField("Name", text: $name, prompt: Text("posts"))
                         .disabled(isSystemCollection)
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -63,106 +63,84 @@ struct CollectionEditorView: View {
                     #endif
 
                     Picker("Type", selection: $type) {
-                        Text("Base").tag(CollectionModelType.base)
-                        Text("Auth").tag(CollectionModelType.auth)
-                        Text("View").tag(CollectionModelType.view)
+                        Label("Base", systemImage: "rectangle.stack").tag(CollectionModelType.base)
+                        Label("Auth", systemImage: "person.badge.key").tag(CollectionModelType.auth)
+                        Label("View", systemImage: "eye").tag(CollectionModelType.view)
                     }
                     .disabled(isEditing)
                 }
 
-                Section {
-                    ForEach(fields.indices, id: \.self) { index in
-                        FieldRow(field: fields[index]) {
-                            editingFieldIndex = index
-                            showFieldEditor = true
+                Section("Schema") {
+                    if fields.isEmpty {
+                        Text("No fields yet")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(fields.indices, id: \.self) { index in
+                            FieldRow(field: fields[index]) {
+                                editingFieldIndex = index
+                                showFieldEditor = true
+                            }
+                            .disabled(fields[index].system)
                         }
-                        .disabled(fields[index].system)
-                    }
-                    .onDelete { indexSet in
-                        // Only delete non-system fields
-                        let indicesToDelete = indexSet.filter { !fields[$0].system }
-                        fields.remove(atOffsets: IndexSet(indicesToDelete))
-                    }
-                    .onMove { from, to in
-                        fields.move(fromOffsets: from, toOffset: to)
+                        .onDelete { indexSet in
+                            let indicesToDelete = indexSet.filter { !fields[$0].system }
+                            fields.remove(atOffsets: IndexSet(indicesToDelete))
+                        }
+                        .onMove { from, to in
+                            fields.move(fromOffsets: from, toOffset: to)
+                        }
                     }
 
-                    Button("Add Field", systemImage: "plus") {
+                    Button {
                         editingFieldIndex = nil
                         showFieldEditor = true
-                    }
-                } header: {
-                    HStack {
-                        Text("Fields")
-                        Spacer()
-                        #if !os(macOS)
-                        EditButton()
-                        #endif
+                    } label: {
+                        Label("New Field", systemImage: "plus.circle.fill")
                     }
                 }
 
-                Section {
+                Section("API Rules") {
                     RuleEditor(name: "List", rule: $listRule)
                     RuleEditor(name: "View", rule: $viewRule)
                     RuleEditor(name: "Create", rule: $createRule)
                     RuleEditor(name: "Update", rule: $updateRule)
                     RuleEditor(name: "Delete", rule: $deleteRule)
-                } header: {
-                    Text("API Rules")
-                } footer: {
-                    Text("Leave empty for public access. Set to nil/null to lock.")
                 }
 
                 if type == .auth {
-                    Section {
+                    Section("Email Templates") {
                         EmailTemplateEditor(
-                            title: "Verification Email",
+                            title: "Verification",
                             subject: $verificationSubject,
                             bodyText: $verificationBody
                         )
-                    } header: {
-                        Text("Email Templates")
-                    } footer: {
-                        Text("Placeholders: {APP_NAME}, {APP_URL}, {TOKEN}, {ACTION_URL}")
-                    }
-
-                    Section {
                         EmailTemplateEditor(
                             title: "Password Reset",
                             subject: $resetPasswordSubject,
                             bodyText: $resetPasswordBody
                         )
-                    }
-
-                    Section {
                         EmailTemplateEditor(
-                            title: "Confirm Email Change",
+                            title: "Email Change",
                             subject: $confirmEmailChangeSubject,
                             bodyText: $confirmEmailChangeBody
                         )
                     }
 
-                    Section {
-                        Toggle("Enable Auth Alert", isOn: $authAlertEnabled)
+                    Section("Security") {
+                        Toggle("Auth Alert", isOn: $authAlertEnabled)
 
                         if authAlertEnabled {
                             EmailTemplateEditor(
-                                title: "Login Alert",
+                                title: "Alert Email",
                                 subject: $authAlertSubject,
                                 bodyText: $authAlertBody
                             )
                         }
-                    } header: {
-                        Text("Auth Alert")
-                    } footer: {
-                        Text("Send email notifications when users login from a new location.")
                     }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(isEditing ? "Edit Collection" : "New Collection")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -177,6 +155,7 @@ struct CollectionEditorView: View {
                             await saveCollection()
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(isSaving || name.isEmpty)
                 }
             }
@@ -439,31 +418,22 @@ struct RuleEditor: View {
     let name: String
     @Binding var rule: String
 
-    @State private var isExpanded = false
-
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            TextField("Rule expression", text: $rule, axis: .vertical)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(name)
+                Spacer()
+                Text(rule.isEmpty ? "Public" : "Custom")
+                    .font(.caption)
+                    .foregroundStyle(rule.isEmpty ? .green : .orange)
+            }
+            TextField("", text: $rule, prompt: Text("Leave empty for public access"))
                 .font(.system(.body, design: .monospaced))
-                .lineLimit(3...6)
+                .textFieldStyle(.roundedBorder)
             #if os(iOS)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             #endif
-        } label: {
-            HStack {
-                Text(name)
-                Spacer()
-                if rule.isEmpty {
-                    Text("(public)")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                } else {
-                    Text("custom")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-            }
         }
     }
 }
@@ -478,44 +448,25 @@ struct EmailTemplateEditor: View {
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Subject")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("Email subject", text: $subject)
-                    #if os(iOS)
-                        .textInputAutocapitalization(.sentences)
-                    #endif
-                }
+                TextField("Subject", text: $subject)
+                    .textFieldStyle(.roundedBorder)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Body")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextEditor(text: $bodyText)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 120)
-                        .padding(4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                }
+                TextEditor(text: $bodyText)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(minHeight: 80)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    )
             }
             .padding(.vertical, 4)
         } label: {
             HStack {
                 Text(title)
                 Spacer()
-                if subject.isEmpty && bodyText.isEmpty {
-                    Text("default")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("custom")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                }
+                Text(subject.isEmpty && bodyText.isEmpty ? "Default" : "Custom")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

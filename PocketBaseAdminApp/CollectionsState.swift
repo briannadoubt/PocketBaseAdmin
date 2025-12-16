@@ -17,6 +17,7 @@ final class CollectionsState {
     var collections: [CollectionState] = []
     var error: String?
     var isLoading: Bool = false
+    var authExpired: Bool = false
 
     var retryCount: Int = 0
     var maxRetryCount: Int = 5
@@ -36,6 +37,12 @@ final class CollectionsState {
     func load(from pocketbase: PocketBase) async {
         isLoading = true
         error = nil
+
+        // Debug: Check auth state
+        logger.info("Loading collections - authStore.isValid: \(pocketbase.authStore.isValid), hasToken: \(pocketbase.authStore.token != nil)")
+        if let token = pocketbase.authStore.token {
+            logger.info("Token prefix: \(String(token.prefix(20)))...")
+        }
 
         do {
             let loadedCollections = try await pocketbase.admin.collections
@@ -65,6 +72,18 @@ final class CollectionsState {
                     await load(from: pocketbase)
                     return
                 }
+            }
+
+            // Check if it's a 401 Unauthorized error - signal auth expired
+            if let networkError = loadError as? NetworkError,
+               case .invalidResponse(_, let statusCode, _, _) = networkError,
+               statusCode == 401 {
+                logger.warning("Authentication expired or invalid")
+                authExpired = true
+                self.error = "Session expired. Please log in again."
+                isLoading = false
+                retryCount = 0
+                return
             }
 
             logger.error("Error loading collections: \(loadError)")

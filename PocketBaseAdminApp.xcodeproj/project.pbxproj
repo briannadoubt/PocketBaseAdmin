@@ -16,7 +16,7 @@
 		035DA1E12EEF3EBC003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E02EEF3EBC003225F0 /* PocketBase */; };
 		035DA1E32EEF3EBC003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */; };
 		035DA1E52EEF3EC1003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */; };
-		035DA20A2EEF6292003225F0 /* PocketBaseWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		035DA20A2EEF6292003225F0 /* PocketBaseWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		035DA2152EEF6320003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2142EEF6320003225F0 /* PocketBase */; };
 		035DA2172EEF6320003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2162EEF6320003225F0 /* PocketBaseAdmin */; };
 		035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2182EEF6326003225F0 /* PocketBaseIntents */; };
@@ -684,6 +684,7 @@
 		};
 		035DA2092EEF6292003225F0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 035DA1E92EEF6290003225F0 /* PocketBaseWatch Watch App */;
 			targetProxy = 035DA2082EEF6292003225F0 /* PBXContainerItemProxy */;
 		};

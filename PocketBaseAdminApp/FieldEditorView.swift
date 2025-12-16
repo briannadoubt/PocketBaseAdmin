@@ -36,8 +36,8 @@ struct FieldEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Field Info") {
-                    TextField("Name", text: $name)
+                Section {
+                    TextField("Name", text: $name, prompt: Text("field_name"))
                         .disabled(isSystemField)
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -46,11 +46,14 @@ struct FieldEditorView: View {
 
                     Picker("Type", selection: $type) {
                         ForEach(FieldType.allCases, id: \.self) { fieldType in
-                            Text(fieldType.displayName).tag(fieldType)
+                            Label(fieldType.displayName, systemImage: fieldType.icon)
+                                .tag(fieldType)
                         }
                     }
                     .disabled(isEditing)
+                }
 
+                Section {
                     Toggle("Required", isOn: $required)
                     Toggle("Presentable", isOn: $presentable)
                 }
@@ -58,55 +61,47 @@ struct FieldEditorView: View {
                 // Type-specific options
                 switch type {
                 case .text, .editor, .password:
-                    Section("Text Options") {
-                        numberField("Min length", text: $min)
-                        numberField("Max length", text: $max)
+                    Section("Validation") {
+                        numberField("Min Length", text: $min)
+                        numberField("Max Length", text: $max)
                     }
 
                 case .number:
-                    Section("Number Options") {
-                        numberField("Min value", text: $min)
-                        numberField("Max value", text: $max)
+                    Section("Validation") {
+                        numberField("Min Value", text: $min)
+                        numberField("Max Value", text: $max)
                     }
 
                 case .select:
-                    Section {
-                        TextField("Values (comma separated)", text: $selectValues, axis: .vertical)
+                    Section("Options") {
+                        TextField("Values", text: $selectValues, prompt: Text("option1, option2, option3"), axis: .vertical)
                             .lineLimit(2...4)
-                        numberField("Max select", text: $maxSelect)
-                    } header: {
-                        Text("Select Options")
-                    } footer: {
-                        Text("Enter values separated by commas, e.g.: option1, option2, option3")
+                        numberField("Max Selections", text: $maxSelect)
                     }
 
                 case .file:
-                    Section {
-                        numberField("Max select", text: $maxSelect)
-                        numberField("Max size (bytes)", text: $maxSize)
-                        TextField("MIME types (comma separated)", text: $mimeTypes, axis: .vertical)
+                    Section("Constraints") {
+                        numberField("Max Files", text: $maxSelect)
+                        numberField("Max Size (bytes)", text: $maxSize)
+                        TextField("MIME Types", text: $mimeTypes, prompt: Text("image/*, application/pdf"), axis: .vertical)
                             .lineLimit(2...4)
-                    } header: {
-                        Text("File Options")
-                    } footer: {
-                        Text("Leave MIME types empty to allow all file types")
                     }
 
                 case .relation:
-                    Section("Relation Options") {
-                        TextField("Collection ID", text: $collectionId)
-                        numberField("Max select", text: $maxSelect)
+                    Section("Relation") {
+                        TextField("Collection ID", text: $collectionId, prompt: Text("target_collection"))
+                        numberField("Max Select", text: $maxSelect)
                         Toggle("Cascade Delete", isOn: $cascadeDelete)
                     }
 
-                case .email, .customEmail, .url, .bool, .date, .dateTime, .autodate, .json, .primaryKey, .geoPoint, .unknown:
+                case .email, .customEmail, .url, .bool, .date, .dateTime, .autodate, .json, .primaryKey, .geoPoint:
+                    EmptyView()
+                case .unknown:
                     EmptyView()
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(isEditing ? "Edit Field" : "New Field")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -118,6 +113,7 @@ struct FieldEditorView: View {
                     Button(isEditing ? "Save" : "Add") {
                         saveField()
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(name.isEmpty)
                 }
             }
@@ -215,6 +211,29 @@ extension FieldType: @retroactive CaseIterable {
         case .primaryKey: return "Primary Key"
         case .geoPoint: return "Geo Point"
         case .unknown(let value): return value.capitalized
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .text: return "textformat"
+        case .editor: return "doc.richtext"
+        case .number: return "number"
+        case .bool: return "checkmark.square"
+        case .email: return "envelope"
+        case .url: return "link"
+        case .date: return "calendar"
+        case .dateTime: return "calendar.badge.clock"
+        case .autodate: return "clock"
+        case .select: return "list.bullet"
+        case .json: return "curlybraces"
+        case .file: return "doc"
+        case .relation: return "arrow.triangle.branch"
+        case .password: return "key"
+        case .customEmail: return "envelope.badge"
+        case .primaryKey: return "key.fill"
+        case .geoPoint: return "mappin"
+        case .unknown: return "questionmark"
         }
     }
 }
