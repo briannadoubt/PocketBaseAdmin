@@ -6,6 +6,7 @@
 //
 
 import XCTest
+@testable import PocketBaseAdminApp
 
 final class PocketBaseAdminUITests: XCTestCase {
 
@@ -23,12 +24,12 @@ final class PocketBaseAdminUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
+    func testCreateNewRecord() throws {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        
     }
 
     @MainActor

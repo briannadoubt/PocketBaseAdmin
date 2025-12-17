@@ -11,7 +11,7 @@ This is a Swift/Xcode project. Use Xcode or xcodebuild:
 xcodebuild -project PocketBaseAdminApp.xcodeproj -scheme PocketBaseAdminApp -destination 'platform=macOS' build
 
 # Build for iOS Simulator
-xcodebuild -project PocketBaseAdminApp.xcodeproj -scheme PocketBaseAdminApp -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project PocketBaseAdminApp.xcodeproj -scheme PocketBaseAdminApp -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
 # Run tests
 xcodebuild -project PocketBaseAdminApp.xcodeproj -scheme PocketBaseAdminApp -destination 'platform=macOS' test
