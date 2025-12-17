@@ -29,6 +29,9 @@ struct FieldEditorView: View {
     @State private var collectionId: String = ""
     @State private var cascadeDelete: Bool = false
     @State private var mimeTypes: String = ""
+    // Autodate options
+    @State private var onCreate: Bool = false
+    @State private var onUpdate: Bool = false
 
     private var isEditing: Bool { field != nil }
     private var isSystemField: Bool { field?.system ?? false }
@@ -94,7 +97,13 @@ struct FieldEditorView: View {
                         Toggle("Cascade Delete", isOn: $cascadeDelete)
                     }
 
-                case .email, .customEmail, .url, .bool, .date, .dateTime, .autodate, .json, .primaryKey, .geoPoint:
+                case .autodate:
+                    Section("Auto-set Date") {
+                        Toggle("On Create", isOn: $onCreate)
+                        Toggle("On Update", isOn: $onUpdate)
+                    }
+
+                case .email, .customEmail, .url, .bool, .date, .dateTime, .json, .primaryKey, .geoPoint:
                     EmptyView()
                 case .unknown:
                     EmptyView()
@@ -155,6 +164,8 @@ struct FieldEditorView: View {
         collectionId = field.collectionId ?? ""
         cascadeDelete = field.cascadeDelete
         mimeTypes = field.mimeTypes.joined(separator: ", ")
+        onCreate = field.onCreate
+        onUpdate = field.onUpdate
     }
 
     private func saveField() {
@@ -172,7 +183,9 @@ struct FieldEditorView: View {
             values: parseCommaSeparated(selectValues),
             collectionId: collectionId.isEmpty ? nil : collectionId,
             cascadeDelete: cascadeDelete,
-            mimeTypes: parseCommaSeparated(mimeTypes)
+            mimeTypes: parseCommaSeparated(mimeTypes),
+            onCreate: onCreate,
+            onUpdate: onUpdate
         )
 
         onSave(editableField)

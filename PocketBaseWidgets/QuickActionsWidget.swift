@@ -83,7 +83,74 @@ struct ViewLogsWidgetIntent: AppIntent {
 struct QuickActionsWidgetView: View {
     var entry: QuickActionsEntry
 
+    @Environment(\.widgetFamily) var family
+    @Environment(\.widgetRenderingMode) var renderingMode
+    @Environment(\.showsWidgetContainerBackground) var showsBackground
+
     var body: some View {
+        switch family {
+        case .systemSmall:
+            smallView
+        case .systemMedium:
+            mediumView
+        case .systemLarge:
+            largeView
+        default:
+            mediumView
+        }
+    }
+
+    private var smallView: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "bolt.fill")
+                    .foregroundStyle(.yellow)
+                Text("Actions")
+                    .font(.caption.bold())
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                Button(intent: CreateBackupWidgetIntent()) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "archivebox")
+                            .font(.title3)
+                            .foregroundStyle(.blue)
+                            .widgetAccentable()
+                        Text("Backup")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.1))
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button(intent: RefreshStatusWidgetIntent()) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.title3)
+                            .foregroundStyle(.green)
+                            .widgetAccentable()
+                        Text("Refresh")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.green.opacity(0.1))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    private var mediumView: some View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "bolt.fill")
@@ -119,6 +186,65 @@ struct QuickActionsWidgetView: View {
         .padding()
         .containerBackground(.fill.tertiary, for: .widget)
     }
+
+    private var largeView: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Image(systemName: "bolt.fill")
+                    .font(.title2)
+                    .foregroundStyle(.yellow)
+                Text("Quick Actions")
+                    .font(.title2.bold())
+                Spacer()
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LargeActionButton(
+                    title: "Create Backup",
+                    subtitle: "Save database",
+                    icon: "archivebox.fill",
+                    color: .blue,
+                    intent: CreateBackupWidgetIntent()
+                )
+
+                LargeActionButton(
+                    title: "Refresh Status",
+                    subtitle: "Update widgets",
+                    icon: "arrow.clockwise",
+                    color: .green,
+                    intent: RefreshStatusWidgetIntent()
+                )
+
+                LargeActionButton(
+                    title: "View Logs",
+                    subtitle: "Open log viewer",
+                    icon: "doc.text.fill",
+                    color: .orange,
+                    intent: ViewLogsWidgetIntent()
+                )
+
+                LargeActionButton(
+                    title: "Open Admin",
+                    subtitle: "Manage server",
+                    icon: "server.rack",
+                    color: .purple,
+                    intent: ViewLogsWidgetIntent()
+                )
+            }
+
+            Spacer(minLength: 0)
+
+            HStack {
+                Text("Tap an action to execute")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding()
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
 }
 
 struct ActionButton<I: AppIntent>: View {
@@ -133,6 +259,7 @@ struct ActionButton<I: AppIntent>: View {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundStyle(color)
+                    .widgetAccentable()
 
                 Text(title)
                     .font(.caption)
@@ -142,6 +269,42 @@ struct ActionButton<I: AppIntent>: View {
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.secondary.opacity(0.1))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct LargeActionButton<I: AppIntent>: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let intent: I
+
+    var body: some View {
+        Button(intent: intent) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title)
+                    .foregroundStyle(color)
+                    .widgetAccentable()
+
+                VStack(spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.primary)
+
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.1))
             )
         }
         .buttonStyle(.plain)
@@ -159,11 +322,27 @@ struct QuickActionsWidget: Widget {
         }
         .configurationDisplayName("Quick Actions")
         .description("Quickly backup, refresh, or view logs")
-        .supportedFamilies([.systemMedium])
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .systemLarge
+        ])
     }
 }
 
 #Preview(as: .systemMedium) {
+    QuickActionsWidget()
+} timeline: {
+    QuickActionsEntry.snapshot
+}
+
+#Preview(as: .systemSmall) {
+    QuickActionsWidget()
+} timeline: {
+    QuickActionsEntry.snapshot
+}
+
+#Preview(as: .systemLarge) {
     QuickActionsWidget()
 } timeline: {
     QuickActionsEntry.snapshot

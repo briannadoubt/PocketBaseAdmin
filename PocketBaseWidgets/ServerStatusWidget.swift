@@ -39,24 +39,20 @@ struct ServerStatusProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ServerStatusEntry>) -> Void) {
         Task {
-            do {
-                let startTime = Date()
-                // TODO: Use PocketBaseIntents.CheckServerStatusIntent when linked
-                // For now, use placeholder
-                let latency = Date().timeIntervalSince(startTime)
+            let startTime = Date()
+            // TODO: Use actual server check
+            let latency = Date().timeIntervalSince(startTime)
 
-                let entry = ServerStatusEntry(
-                    date: Date(),
-                    isOnline: true,
-                    latency: latency,
-                    lastChecked: Date()
-                )
+            let entry = ServerStatusEntry(
+                date: Date(),
+                isOnline: true,
+                latency: latency,
+                lastChecked: Date()
+            )
 
-                // Refresh every 15 minutes
-                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
-                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-                completion(timeline)
-            }
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            completion(timeline)
         }
     }
 }
@@ -67,6 +63,8 @@ struct ServerStatusWidgetView: View {
     var entry: ServerStatusEntry
 
     @Environment(\.widgetFamily) var family
+    @Environment(\.widgetRenderingMode) var renderingMode
+    @Environment(\.showsWidgetContainerBackground) var showsBackground
 
     var body: some View {
         switch family {
@@ -74,8 +72,12 @@ struct ServerStatusWidgetView: View {
             smallView
         case .systemMedium:
             mediumView
+        case .systemLarge:
+            largeView
         case .accessoryCircular:
             circularView
+        case .accessoryRectangular:
+            rectangularView
         case .accessoryInline:
             inlineView
         default:
@@ -90,6 +92,7 @@ struct ServerStatusWidgetView: View {
 
             Text(entry.isOnline ? "Online" : "Offline")
                 .font(.headline)
+                .widgetAccentable()
 
             if let latency = entry.latency {
                 Text("\(Int(latency * 1000))ms")
@@ -116,6 +119,7 @@ struct ServerStatusWidgetView: View {
                 Text(entry.isOnline ? "Server Online" : "Server Offline")
                     .font(.subheadline)
                     .foregroundStyle(entry.isOnline ? .green : .red)
+                    .widgetAccentable()
 
                 if let latency = entry.latency {
                     Text("Response: \(Int(latency * 1000))ms")
@@ -134,11 +138,72 @@ struct ServerStatusWidgetView: View {
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
+    private var largeView: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Image(systemName: "server.rack")
+                    .font(.title2)
+                Text("PocketBase Server")
+                    .font(.title2.bold())
+                Spacer()
+            }
+
+            HStack(spacing: 24) {
+                VStack {
+                    statusIndicator
+                        .font(.system(size: 72))
+                    Text(entry.isOnline ? "Online" : "Offline")
+                        .font(.title3.bold())
+                        .foregroundStyle(entry.isOnline ? .green : .red)
+                        .widgetAccentable()
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    if let latency = entry.latency {
+                        LargeStatRow(icon: "bolt", label: "Latency", value: "\(Int(latency * 1000))ms")
+                    }
+                    LargeStatRow(icon: "clock", label: "Last Check", value: entry.lastChecked.formatted(date: .omitted, time: .shortened))
+                    LargeStatRow(icon: "arrow.clockwise", label: "Next Update", value: "15 min")
+                }
+
+                Spacer()
+            }
+
+            Spacer(minLength: 0)
+
+            HStack {
+                Text("Tap to open admin panel")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding()
+        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
     private var circularView: some View {
         ZStack {
             AccessoryWidgetBackground()
             statusIndicator
                 .font(.title)
+        }
+    }
+
+    private var rectangularView: some View {
+        HStack(spacing: 8) {
+            statusIndicator
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PocketBase")
+                    .font(.headline)
+                Text(entry.isOnline ? "Online" : "Offline")
+                    .font(.caption)
+                    .foregroundStyle(entry.isOnline ? .green : .red)
+                    .widgetAccentable()
+            }
         }
     }
 
@@ -152,6 +217,49 @@ struct ServerStatusWidgetView: View {
     private var statusIndicator: some View {
         Image(systemName: entry.isOnline ? "checkmark.circle.fill" : "xmark.circle.fill")
             .foregroundStyle(entry.isOnline ? .green : .red)
+            .widgetAccentable()
+    }
+}
+
+struct StatRow: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+        }
+        .font(.subheadline)
+    }
+}
+
+struct LargeStatRow: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+        }
     }
 }
 
@@ -166,16 +274,30 @@ struct ServerStatusWidget: Widget {
         }
         .configurationDisplayName("Server Status")
         .description("Monitor your PocketBase server status")
+#if os(watchOS)
+        .supportedFamilies([
+            .accessoryCircular,
+            .accessoryRectangular,
+            .accessoryInline
+        ])
+#elseif os(iOS)
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
+            .systemLarge,
             .accessoryCircular,
+            .accessoryRectangular,
             .accessoryInline
         ])
+#else
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .systemLarge
+        ])
+#endif
     }
 }
-
-// MARK: - Preview
 
 #Preview(as: .systemSmall) {
     ServerStatusWidget()

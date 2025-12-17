@@ -38,8 +38,34 @@ struct CollectionEditorView: View {
 
     @State private var isSaving = false
     @State private var errorMessage: String?
-    @State private var showFieldEditor = false
-    @State private var editingFieldIndex: Int?
+    @State private var fieldEditorMode: FieldEditorMode?
+
+    /// Mode for the field editor sheet
+    enum FieldEditorMode: Identifiable {
+        case new
+        case edit(Int, EditableField)
+
+        var id: String {
+            switch self {
+            case .new: return "new-field"
+            case .edit(let index, _): return "edit-\(index)"
+            }
+        }
+
+        var field: EditableField? {
+            switch self {
+            case .new: return nil
+            case .edit(_, let field): return field
+            }
+        }
+
+        var index: Int? {
+            switch self {
+            case .new: return nil
+            case .edit(let index, _): return index
+            }
+        }
+    }
 
     private var isEditing: Bool { collection != nil }
     private var isSystemCollection: Bool { collection?.system ?? false }
@@ -77,8 +103,7 @@ struct CollectionEditorView: View {
                     } else {
                         ForEach(fields.indices, id: \.self) { index in
                             FieldRow(field: fields[index]) {
-                                editingFieldIndex = index
-                                showFieldEditor = true
+                                fieldEditorMode = .edit(index, fields[index])
                             }
                             .disabled(fields[index].system)
                         }
@@ -92,8 +117,7 @@ struct CollectionEditorView: View {
                     }
 
                     Button {
-                        editingFieldIndex = nil
-                        showFieldEditor = true
+                        fieldEditorMode = .new
                     } label: {
                         Label("New Field", systemImage: "plus.circle.fill")
                     }
@@ -160,11 +184,11 @@ struct CollectionEditorView: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
-            .sheet(isPresented: $showFieldEditor) {
+            .sheet(item: $fieldEditorMode) { mode in
                 FieldEditorView(
-                    field: editingFieldIndex.map { fields[$0] },
+                    field: mode.field,
                     onSave: { editedField in
-                        if let index = editingFieldIndex {
+                        if let index = mode.index {
                             fields[index] = editedField
                         } else {
                             fields.append(editedField)
@@ -266,6 +290,12 @@ struct CollectionEditorView: View {
             onSave(savedCollection)
             dismiss()
         } catch {
+            // Log the full error for debugging
+            print("Collection save error: \(error)")
+            print("Error type: \(Swift.type(of: error))")
+            if let networkError = error as? NetworkError {
+                print("Network error details: \(networkError)")
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -289,6 +319,9 @@ struct EditableField: Identifiable {
     var collectionId: String?
     var cascadeDelete: Bool
     var mimeTypes: [String]
+    // Autodate options
+    var onCreate: Bool
+    var onUpdate: Bool
 
     init(
         id: String = UUID().uuidString,
@@ -304,7 +337,9 @@ struct EditableField: Identifiable {
         values: [String] = [],
         collectionId: String? = nil,
         cascadeDelete: Bool = false,
-        mimeTypes: [String] = []
+        mimeTypes: [String] = [],
+        onCreate: Bool = false,
+        onUpdate: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -320,6 +355,8 @@ struct EditableField: Identifiable {
         self.collectionId = collectionId
         self.cascadeDelete = cascadeDelete
         self.mimeTypes = mimeTypes
+        self.onCreate = onCreate
+        self.onUpdate = onUpdate
     }
 
     init(from field: Field) {
@@ -337,14 +374,19 @@ struct EditableField: Identifiable {
         self.collectionId = field.options?.collectionId
         self.cascadeDelete = field.options?.cascadeDelete ?? false
         self.mimeTypes = field.options?.mimeTypes ?? []
+        self.onCreate = field.options?.onCreate ?? false
+        self.onUpdate = field.options?.onUpdate ?? false
     }
 
     func toField() -> Field {
         let options: FieldOptions?
 
+        // For autodate fields, onCreate/onUpdate are required
+        let needsAutodateOptions = type == .autodate && (onCreate || onUpdate)
+
         // Only include options if they have values
         if min != nil || max != nil || maxSelect != nil || maxSize != nil ||
-            !values.isEmpty || collectionId != nil || cascadeDelete || !mimeTypes.isEmpty {
+            !values.isEmpty || collectionId != nil || cascadeDelete || !mimeTypes.isEmpty || needsAutodateOptions {
             options = FieldOptions(
                 min: min,
                 max: max,
@@ -353,7 +395,9 @@ struct EditableField: Identifiable {
                 values: values.isEmpty ? nil : values,
                 collectionId: collectionId,
                 cascadeDelete: cascadeDelete ? true : nil,
-                mimeTypes: mimeTypes.isEmpty ? nil : mimeTypes
+                mimeTypes: mimeTypes.isEmpty ? nil : mimeTypes,
+                onCreate: onCreate ? true : nil,
+                onUpdate: onUpdate ? true : nil
             )
         } else {
             options = nil

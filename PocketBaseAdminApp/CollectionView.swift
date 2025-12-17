@@ -10,6 +10,11 @@ import PocketBaseAdmin
 import PocketBase
 import OSLog
 import Foundation
+import NukeUI
+
+#if os(visionOS)
+import RealityKit
+#endif
 
 @Observable @MainActor
 final class CollectionState: Identifiable {
@@ -120,16 +125,9 @@ struct CollectionView: View {
         return hasCreatedKey ? "-created" : nil
     }
 
-    /// Presentable fields to show in compact card view (limit to first few meaningful fields)
+    /// Presentable fields marked in PocketBase schema
     private var presentableFields: [Field] {
-        let fields = schema.filter { field in
-            // Prioritize presentable fields, then text/email fields
-            field.presentable == true ||
-            field.type == .text ||
-            field.type == .email ||
-            field.type == .select
-        }
-        return Array(fields.prefix(3))
+        schema.filter { $0.presentable == true }
     }
 
     @Environment(\.pocketbase) private var pocketbase
@@ -282,7 +280,11 @@ struct CollectionView: View {
             .padding(.horizontal)
             .padding(.top, 8)
         }
+        #if os(iOS)
         .background(Color(.systemGroupedBackground))
+        #else
+        .background(Color(nsColor: .windowBackgroundColor))
+        #endif
     }
 
     // MARK: - Regular Layout (macOS/iPad)
@@ -307,7 +309,7 @@ struct CollectionView: View {
 
             TableColumnForEach(schema, id: \.id) { field in
                 TableColumn(field.name) { record in
-                    FieldView(field: field, record: record, collectionsState: collectionsState)
+                    FieldView(field: field, record: record, collectionsState: collectionsState, isCompact: true)
                 }
                 .width(min: 80, ideal: columnWidth(for: field), max: 300)
             }
@@ -560,57 +562,132 @@ struct RecordCardView: View {
     var collectionsState: CollectionsState?
     var onEdit: (() -> Void)?
 
+    @Environment(\.pocketbase) private var pocketbase
     @State private var isExpanded = false
+    @State private var selectedFileForPreview: FilePreviewItem?
 
-    /// Get summary fields to show in collapsed state (prioritize presentable fields)
-    private var summaryFields: [(String, String)] {
-        var results: [(String, String)] = []
-
-        // First try presentable fields
-        for field in presentableFields.prefix(2) {
-            if let value = record.content[field.name], !isEmptyValue(value) {
-                results.append((field.name, stringValue(from: value)))
-            }
+    /// Get presentable field values to show in collapsed state
+    private var presentableValues: [String] {
+        presentableFields.compactMap { field in
+            // Skip file fields in text summary
+            guard field.type != .file else { return nil }
+            guard let value = record.content[field.name], !isEmptyValue(value) else { return nil }
+            return stringValue(from: value)
         }
+    }
 
-        // If no presentable fields, try common field names
-        if results.isEmpty {
-            for fieldName in ["name", "title", "label", "email", "username"] {
-                if let value = record.content[fieldName], !isEmptyValue(value) {
-                    results.append((fieldName, stringValue(from: value)))
-                    break
+    /// Get the first visual media file (image/video) for the card header
+    private var headerMediaFile: (filename: String, category: FileCategory)? {
+        for field in schema where field.type == .file {
+            if let value = record.content[field.name], !isEmptyValue(value) {
+                if let filename = getFilename(from: value) {
+                    let category = FileCategory.from(filename: filename)
+                    if category.isVisualMedia {
+                        return (filename, category)
+                    }
                 }
             }
         }
+        return nil
+    }
 
-        return results
+    /// URL for the header thumbnail
+    private var headerThumbnailURL: URL? {
+        guard let media = headerMediaFile else { return nil }
+        return pocketbase.fileURL(
+            collectionIdOrName: record.collectionName,
+            recordId: record.id,
+            filename: media.filename,
+            thumb: .crop(width: 400, height: 200)
+        )
     }
 
     /// All displayable fields for expanded view
-    private var allFields: [(String, String)] {
-        var results: [(String, String)] = []
+    private var allFields: [(field: Field?, name: String, value: JSONValue)] {
+        var results: [(field: Field?, name: String, value: JSONValue)] = []
 
         // Add ID first
-        results.append(("id", record.id))
+        results.append((nil, "id", .string(record.id)))
 
         // Add schema fields
         for field in schema {
             if let value = record.content[field.name] {
-                results.append((field.name, stringValue(from: value)))
+                results.append((field, field.name, value))
             }
         }
 
         // Add created/updated if available
         if let created = record.created {
-            results.append(("created", created.formatted(date: .numeric, time: .omitted)))
+            results.append((nil, "created", .date(created)))
         }
 
         return results
     }
 
+    private func getFilename(from value: JSONValue) -> String? {
+        switch value {
+        case .string(let s) where !s.isEmpty: return s
+        case .array(let arr):
+            if case .string(let s) = arr.first { return s }
+            return nil
+        default: return nil
+        }
+    }
+
+    private func getAllFilenames(from value: JSONValue) -> [String] {
+        switch value {
+        case .string(let s) where !s.isEmpty: return [s]
+        case .array(let arr):
+            return arr.compactMap { item in
+                if case .string(let s) = item, !s.isEmpty { return s }
+                return nil
+            }
+        default: return []
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header - always visible
+            // Header media thumbnail
+            if let thumbnailURL = headerThumbnailURL, let media = headerMediaFile {
+                ZStack(alignment: .bottomTrailing) {
+                    LazyImage(url: thumbnailURL) { state in
+                        if let image = state.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else if state.error != nil {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.1))
+                                .overlay {
+                                    Image(systemName: media.category.icon)
+                                        .font(.largeTitle)
+                                        .foregroundStyle(.secondary)
+                                }
+                        } else {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.1))
+                                .overlay { ProgressView() }
+                        }
+                    }
+                    .frame(height: 120)
+                    .clipped()
+
+                    // Video indicator
+                    if media.category == .video {
+                        Image(systemName: "play.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 2)
+                            .padding(8)
+                    }
+                }
+                .clipShape(
+                    UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10)
+                )
+            }
+
+            // Header text - always visible
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
@@ -618,20 +695,23 @@ struct RecordCardView: View {
             } label: {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("id: \(record.id)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
+                        if !presentableValues.isEmpty {
+                            // Show presentable values prominently, ID secondary
+                            Text(presentableValues.joined(separator: " · "))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
 
-                        if !summaryFields.isEmpty {
-                            HStack(spacing: 12) {
-                                ForEach(summaryFields, id: \.0) { name, value in
-                                    Text("\(name): \(value)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .lineLimit(1)
+                            Text("id: \(record.id)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            // No presentable field, show ID prominently
+                            Text("id: \(record.id)")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
                         }
                     }
 
@@ -643,6 +723,7 @@ struct RecordCardView: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
+                .padding(12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -650,28 +731,44 @@ struct RecordCardView: View {
             // Expanded content
             if isExpanded {
                 Divider()
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
 
-                VStack(spacing: 8) {
-                    ForEach(allFields, id: \.0) { name, value in
-                        HStack(alignment: .top) {
-                            Text(name)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: 80, alignment: .leading)
+                VStack(spacing: 12) {
+                    ForEach(allFields, id: \.name) { field, name, value in
+                        if let field, field.type == .file {
+                            // File field - show proper file preview
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(name)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
 
-                            Spacer()
+                                FileFieldView(
+                                    fieldValue: value,
+                                    record: record,
+                                    pocketbase: pocketbase,
+                                    isCompact: false
+                                )
+                            }
+                        } else {
+                            // Regular field
+                            HStack(alignment: .top) {
+                                Text(name)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .frame(minWidth: 80, alignment: .leading)
 
-                            Text(value)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.trailing)
+                                Spacer()
+
+                                fieldValueView(for: field, value: value)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                    .multilineTextAlignment(.trailing)
+                            }
                         }
                     }
 
                     if let onEdit {
                         Divider()
-                            .padding(.vertical, 4)
 
                         Button {
                             onEdit()
@@ -684,17 +781,60 @@ struct RecordCardView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
+                .padding(12)
             }
         }
-        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
+                #if os(iOS)
                 .fill(Color(.systemBackground))
+                #else
+                .fill(Color(nsColor: .controlBackgroundColor))
+                #endif
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
+                #if os(iOS)
                 .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+                #else
+                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
+                #endif
         )
+        .quickLookPreview($selectedFileForPreview)
+    }
+
+    @ViewBuilder
+    private func fieldValueView(for field: Field?, value: JSONValue) -> some View {
+        if let field {
+            switch field.type {
+            case .bool:
+                if case .bool(let b) = value {
+                    Image(systemName: b ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(b ? .green : .secondary)
+                } else {
+                    Text(stringValue(from: value))
+                }
+            case .date, .dateTime, .autodate:
+                if case .date(let date) = value {
+                    Text(date, format: .dateTime)
+                } else if case .string(let str) = value, let date = ISO8601DateFormatter().date(from: str) {
+                    Text(date, format: .dateTime)
+                } else {
+                    Text(stringValue(from: value))
+                }
+            case .url:
+                if case .string(let str) = value, let url = URL(string: str) {
+                    Link(str, destination: url)
+                        .lineLimit(1)
+                } else {
+                    Text(stringValue(from: value))
+                }
+            default:
+                Text(stringValue(from: value))
+            }
+        } else {
+            Text(stringValue(from: value))
+        }
     }
 
     private func isEmptyValue(_ value: JSONValue) -> Bool {
@@ -812,6 +952,9 @@ struct FieldView: View {
     var field: Field
     var record: RecordModel
     var collectionsState: CollectionsState?
+    var isCompact: Bool = false
+
+    @Environment(\.pocketbase) private var pocketbase
 
     /// Get presentable field values from an expanded relation record
     private func presentableValue(from expandedRecord: [String: JSONValue], collectionId: String?) -> String? {
@@ -913,19 +1056,12 @@ struct FieldView: View {
                     JSONValueView(value: fieldValue)
                 }
             case .file:
-                if case .string(let string) = fieldValue, let url = URL(string: string) {
-                    Link("File", destination: url)
-                } else if case .array(let array) = fieldValue {
-                    VStack(alignment: .leading) {
-                        ForEach(array.indices, id: \ .self) { idx in
-                            if case .string(let urlString) = array[idx], let url = URL(string: urlString) {
-                                Link("File \(idx + 1)", destination: url)
-                            }
-                        }
-                    }
-                } else {
-                    JSONValueView(value: fieldValue)
-                }
+                FileFieldView(
+                    fieldValue: fieldValue,
+                    record: record,
+                    pocketbase: pocketbase,
+                    isCompact: isCompact
+                )
             case .json:
                 JSONValueView(value: fieldValue)
             case .number:
