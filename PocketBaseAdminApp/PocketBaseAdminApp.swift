@@ -44,6 +44,13 @@ struct PocketBaseAdminApp: App {
             TextEditingCommands()
             TextFormattingCommands()
         }
+
+#if os(macOS)
+        Settings {
+            SettingsWindowView()
+                .pocketbase(.localhost)
+        }
+#endif
     }
 }
 
