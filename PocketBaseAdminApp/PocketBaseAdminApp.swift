@@ -15,6 +15,10 @@ import PocketBaseIntents
 
 @main
 struct PocketBaseAdminApp: App {
+    #if os(macOS)
+    @State private var serverManager = PocketBaseServerManager()
+    #endif
+
     init() {
         // Register background tasks for health checks and notifications
         #if !os(macOS)
@@ -32,12 +36,18 @@ struct PocketBaseAdminApp: App {
 #else
                 .pocketbase(url: URL(string: "https://api.pocketbase.app")!)
 #endif
+#if os(macOS)
+                .environment(\.serverManager, serverManager)
+#endif
         }
 #if os(macOS)
         .defaultSize(width: 1200, height: 800)
 #endif
         .commands {
             AppCommands()
+            #if os(macOS)
+            ServerCommands()
+            #endif
             InspectorCommands()
             SidebarCommands()
             ToolbarCommands()
@@ -58,7 +68,11 @@ struct AdminRootView: View {
             if isCheckingAuth {
                 ProgressView("Checking authentication...")
             } else if isAuthenticated {
+                #if os(macOS)
+                ConsoleContainerView(onLogout: logout)
+                #else
                 ContentView(onLogout: logout)
+                #endif
             } else {
                 AdminLoginView {
                     isAuthenticated = true
