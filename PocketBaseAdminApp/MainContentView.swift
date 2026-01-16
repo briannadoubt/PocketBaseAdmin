@@ -8,37 +8,32 @@
 #if os(macOS)
 import SwiftUI
 
-/// Main view container with collapsible console pane
+/// Main view container with collapsible console pane using native VSplitView
 struct ConsoleContainerView: View {
     var onLogout: (() -> Void)?
 
     @Environment(\.serverManager) private var serverManager
 
     @AppStorage("io.pocketbase.admin.consoleVisible") private var isConsoleVisible = false
-    @State private var consoleHeight: CGFloat = 200
-
-    private let minConsoleHeight: CGFloat = 100
-    private let maxConsoleHeight: CGFloat = 500
 
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                // Main content
-                ContentView(onLogout: onLogout)
-                    .frame(maxHeight: isConsoleVisible ? geometry.size.height - consoleHeight - 40 : .infinity)
+        VStack(spacing: 0) {
+            if isConsoleVisible {
+                VSplitView {
+                    // Main content (top)
+                    ContentView(onLogout: onLogout)
+                        .frame(minHeight: 200)
 
-                if isConsoleVisible {
-                    // Drag handle
-                    dragHandle
-
-                    // Console pane
+                    // Console pane (bottom)
                     consolePaneContent
-                        .frame(height: consoleHeight)
+                        .frame(minHeight: 100, idealHeight: 200)
                 }
-
-                // Bottom bar
-                ConsoleBottomBar(isConsoleVisible: $isConsoleVisible)
+            } else {
+                ContentView(onLogout: onLogout)
             }
+
+            // Bottom bar (always visible)
+            ConsoleBottomBar(isConsoleVisible: $isConsoleVisible)
         }
         .focusedSceneValue(\.serverManager, serverManager)
         .toolbar {
@@ -62,33 +57,6 @@ struct ConsoleContainerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .stopServer)) { _ in
             serverManager?.stop()
         }
-    }
-
-    private var dragHandle: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(height: 1)
-            .overlay(alignment: .center) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 36, height: 4)
-                    .padding(.vertical, 2)
-            }
-            .background(Color(nsColor: .windowBackgroundColor))
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let newHeight = consoleHeight - value.translation.height
-                        consoleHeight = max(minConsoleHeight, min(maxConsoleHeight, newHeight))
-                    }
-            )
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeUpDown.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
     }
 
     private var consolePaneContent: some View {
