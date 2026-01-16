@@ -268,12 +268,6 @@ final class PocketBaseServerManager {
         }
     }
 
-    deinit {
-        // Ensure we clean up the process if still running
-        if process?.isRunning == true {
-            process?.terminate()
-        }
-    }
 }
 
 // MARK: - Environment Key
