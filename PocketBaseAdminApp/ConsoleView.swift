@@ -9,6 +9,7 @@
 import SwiftUI
 
 /// Console view displaying PocketBase server logs
+@available(macOS 15.0, *)
 struct ConsoleView: View {
     @Environment(\.serverManager) private var serverManager
 
@@ -61,6 +62,7 @@ struct ConsoleView: View {
     }
 }
 
+@available(macOS 15.0, *)
 struct LogEntryRow: View {
     let entry: PocketBaseServerManager.LogEntry
 
@@ -99,6 +101,7 @@ struct LogEntryRow: View {
     }
 }
 
+@available(macOS 15.0, *)
 #Preview {
     ConsoleView()
         .frame(height: 300)

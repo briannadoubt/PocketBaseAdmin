@@ -9,6 +9,7 @@
 import SwiftUI
 
 /// Menu bar commands for controlling the local PocketBase server
+@available(macOS 15.0, *)
 struct ServerCommands: Commands {
     @FocusedValue(\.serverManager) var serverManager
 
@@ -24,7 +25,9 @@ struct ServerCommands: Commands {
             .disabled(!(serverManager?.state.canStart ?? true))
 
             Button("Stop Server") {
-                serverManager?.stop()
+                Task {
+                    await serverManager?.stop()
+                }
             }
             .keyboardShortcut(".", modifiers: [.command])
             .disabled(!(serverManager?.state.canStop ?? false))
@@ -51,10 +54,12 @@ struct ServerCommands: Commands {
 
 // MARK: - Focused Value for Server Manager
 
+@available(macOS 15.0, *)
 struct ServerManagerKey: FocusedValueKey {
     typealias Value = PocketBaseServerManager
 }
 
+@available(macOS 15.0, *)
 extension FocusedValues {
     var serverManager: PocketBaseServerManager? {
         get { self[ServerManagerKey.self] }

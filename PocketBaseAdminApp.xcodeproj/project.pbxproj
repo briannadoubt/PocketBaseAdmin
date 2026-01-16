@@ -22,6 +22,8 @@
 		035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2182EEF6326003225F0 /* PocketBaseIntents */; };
 		037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 037F11EE2D90A587009717C8 /* PocketBaseAdmin */; };
 		0386276C2E10C58900E37D56 /* BetterTable in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 0386276B2E10C58900E37D56 /* BetterTable */; };
+		03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */ = {isa = PBXBuildFile; productRef = 03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */; };
+		03E7D9AA2F1A2A6E004233F5 /* Subprocess in Frameworks */ = {isa = PBXBuildFile; productRef = 03E7D9A92F1A2A6E004233F5 /* Subprocess */; };
 		03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */ = {isa = PBXBuildFile; productRef = 03EAC97C2D92746200E85F29 /* PocketBaseUI */; };
 /* End PBXBuildFile section */
 
@@ -196,7 +198,9 @@
 				030D576F2E11FF0B000E174B /* NukeUI in Frameworks */,
 				03214DE82D881386004F65F1 /* KeyPathIterable in Frameworks */,
 				0386276C2E10C58900E37D56 /* BetterTable in Frameworks */,
+				03E7D9AA2F1A2A6E004233F5 /* Subprocess in Frameworks */,
 				037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */,
+				03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */,
 				03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */,
 				035DA1712EEEBAFA003225F0 /* PocketBaseIntents in Frameworks */,
 			);
@@ -331,6 +335,8 @@
 				0386276B2E10C58900E37D56 /* BetterTable */,
 				030D576E2E11FF0B000E174B /* NukeUI */,
 				035DA1702EEEBAFA003225F0 /* PocketBaseIntents */,
+				03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */,
+				03E7D9A92F1A2A6E004233F5 /* Subprocess */,
 			);
 			productName = PocketBaseAdmin;
 			productReference = 03214DB22D87F778004F65F1 /* PocketBaseAdminApp.app */;
@@ -529,6 +535,7 @@
 				03214DE62D881386004F65F1 /* XCRemoteSwiftPackageReference "KeyPathIterable" */,
 				030D576D2E11FF0B000E174B /* XCRemoteSwiftPackageReference "Nuke" */,
 				035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */,
+				03E7D9A82F1A2A6E004233F5 /* XCRemoteSwiftPackageReference "swift-subprocess" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 03214DB32D87F778004F65F1 /* Products */;
@@ -1388,6 +1395,14 @@
 				minimumVersion = 0.1.1;
 			};
 		};
+		03E7D9A82F1A2A6E004233F5 /* XCRemoteSwiftPackageReference "swift-subprocess" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swiftlang/swift-subprocess";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1438,6 +1453,15 @@
 		0386276B2E10C58900E37D56 /* BetterTable */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BetterTable;
+		};
+		03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PocketBaseServerLib;
+		};
+		03E7D9A92F1A2A6E004233F5 /* Subprocess */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 03E7D9A82F1A2A6E004233F5 /* XCRemoteSwiftPackageReference "swift-subprocess" */;
+			productName = Subprocess;
 		};
 		03EAC97C2D92746200E85F29 /* PocketBaseUI */ = {
 			isa = XCSwiftPackageProductDependency;

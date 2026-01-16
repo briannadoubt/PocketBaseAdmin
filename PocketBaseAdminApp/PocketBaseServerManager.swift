@@ -8,8 +8,10 @@
 #if os(macOS)
 import Foundation
 import SwiftUI
+import Subprocess
 
 /// Manages the lifecycle of a local PocketBase server instance
+@available(macOS 15.0, *)
 @Observable @MainActor
 final class PocketBaseServerManager {
 
@@ -18,6 +20,7 @@ final class PocketBaseServerManager {
         case starting
         case running
         case stopping
+        case downloading
         case error(String)
 
         var isRunning: Bool {
@@ -46,54 +49,31 @@ final class PocketBaseServerManager {
     /// Console output logs
     private(set) var logs: [LogEntry] = []
 
-    /// The running process
-    private var process: Process?
+    /// The port PocketBase runs on
+    let port: Int = 8090
 
-    /// Output pipe for stdout
-    private var stdoutPipe: Pipe?
+    /// Task running the server process
+    private var serverTask: Task<Void, Never>?
 
-    /// Output pipe for stderr
-    private var stderrPipe: Pipe?
-
-    /// Data directory for the PocketBase instance
+    /// Data directory for persistence
     var dataDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("PocketBaseAdmin/pb_data", isDirectory: true)
     }
 
-    /// The port to run PocketBase on
-    var port: Int = 8090
+    /// Directory where PocketBase binary is stored
+    private var binDirectory: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("PocketBaseAdmin/bin", isDirectory: true)
+    }
 
     /// Path to the PocketBase executable
-    var executablePath: URL? {
-        // First, check if bundled with the app
-        if let bundledPath = Bundle.main.url(forResource: "container", withExtension: nil) {
-            return bundledPath
-        }
-
-        // Check in Application Support
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appSupportPath = appSupport.appendingPathComponent("PocketBaseAdmin/container")
-        if FileManager.default.fileExists(atPath: appSupportPath.path) {
-            return appSupportPath
-        }
-
-        // Check common locations
-        let commonPaths = [
-            "/usr/local/bin/pocketbase",
-            "/opt/homebrew/bin/pocketbase",
-            "~/.pocketbase/pocketbase"
-        ]
-
-        for path in commonPaths {
-            let expandedPath = NSString(string: path).expandingTildeInPath
-            if FileManager.default.fileExists(atPath: expandedPath) {
-                return URL(fileURLWithPath: expandedPath)
-            }
-        }
-
-        return nil
+    private var executablePath: URL {
+        binDirectory.appendingPathComponent("pocketbase")
     }
+
+    /// PocketBase version to download
+    private let pocketbaseVersion = "0.25.9"
 
     struct LogEntry: Identifiable, Equatable {
         let id = UUID()
@@ -109,14 +89,70 @@ final class PocketBaseServerManager {
     }
 
     init() {
-        ensureDataDirectoryExists()
+        ensureDirectoriesExist()
     }
 
-    private func ensureDataDirectoryExists() {
-        try? FileManager.default.createDirectory(
-            at: dataDirectory,
-            withIntermediateDirectories: true
+    private func ensureDirectoriesExist() {
+        try? FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
+    }
+
+    /// Check if PocketBase is installed
+    private var isPocketBaseInstalled: Bool {
+        FileManager.default.isExecutableFile(atPath: executablePath.path)
+    }
+
+    /// Download PocketBase if not installed
+    private func ensurePocketBaseInstalled() async throws {
+        if isPocketBaseInstalled {
+            appendLog("PocketBase binary found")
+            return
+        }
+
+        state = .downloading
+        appendLog("Downloading PocketBase v\(pocketbaseVersion)...")
+
+        // Determine architecture
+        let arch = ProcessInfo.processInfo.machineArchitecture
+        let archSuffix = arch == "arm64" ? "darwin_arm64" : "darwin_amd64"
+
+        let downloadURL = URL(string: "https://github.com/pocketbase/pocketbase/releases/download/v\(pocketbaseVersion)/pocketbase_\(pocketbaseVersion)_\(archSuffix).zip")!
+
+        // Download the zip file
+        let (zipData, response) = try await URLSession.shared.data(from: downloadURL)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw ServerError.downloadFailed("Failed to download PocketBase")
+        }
+
+        appendLog("Downloaded \(ByteCountFormatter.string(fromByteCount: Int64(zipData.count), countStyle: .file))")
+
+        // Save zip to temp file
+        let tempZipURL = FileManager.default.temporaryDirectory.appendingPathComponent("pocketbase.zip")
+        try zipData.write(to: tempZipURL)
+
+        // Unzip using ditto (macOS built-in)
+        appendLog("Extracting PocketBase...")
+
+        let unzipResult = try await Subprocess.run(
+            .path("/usr/bin/ditto"),
+            arguments: ["-xk", tempZipURL.path, binDirectory.path]
         )
+
+        guard unzipResult.terminationStatus.isSuccess else {
+            throw ServerError.extractionFailed("Failed to extract PocketBase")
+        }
+
+        // Make executable
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executablePath.path
+        )
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tempZipURL)
+
+        appendLog("PocketBase v\(pocketbaseVersion) installed successfully")
     }
 
     /// Start the PocketBase server
@@ -126,79 +162,91 @@ final class PocketBaseServerManager {
             return
         }
 
-        guard let executable = executablePath else {
-            state = .error("PocketBase executable not found")
-            appendLog("Error: PocketBase executable not found. Please install PocketBase or place it in the app bundle.", isError: true)
-            return
-        }
-
         state = .starting
-        appendLog("Starting PocketBase server...")
-
-        let process = Process()
-        self.process = process
-
-        process.executableURL = executable
-        process.arguments = [
-            "serve",
-            "--dir", dataDirectory.path,
-            "--http", "127.0.0.1:\(port)"
-        ]
-
-        // Set up pipes for output capture
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        self.stdoutPipe = stdoutPipe
-        self.stderrPipe = stderrPipe
-
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        // Handle stdout
-        stdoutPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                Task { @MainActor in
-                    self?.processOutput(output, isError: false)
-                }
-            }
-        }
-
-        // Handle stderr
-        stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
-                Task { @MainActor in
-                    self?.processOutput(output, isError: true)
-                }
-            }
-        }
-
-        // Handle process termination
-        process.terminationHandler = { [weak self] process in
-            Task { @MainActor in
-                self?.handleTermination(exitCode: process.terminationStatus)
-            }
-        }
+        appendLog("Initializing PocketBase server...")
 
         do {
-            try process.run()
+            // Ensure PocketBase is installed
+            try await ensurePocketBaseInstalled()
 
-            // Wait a moment to check if the server started successfully
-            try? await Task.sleep(for: .milliseconds(500))
+            state = .starting
+            appendLog("Starting PocketBase on port \(port)...")
 
-            if process.isRunning {
-                state = .running
-                appendLog("Server is running on http://127.0.0.1:\(port)")
+            // Start the server in a background task
+            serverTask = Task.detached { [weak self] in
+                await self?.runServer()
             }
+
         } catch {
             state = .error(error.localizedDescription)
             appendLog("Failed to start server: \(error.localizedDescription)", isError: true)
         }
     }
 
+    /// Run the server process and stream output
+    private func runServer() async {
+        do {
+            try await Subprocess.run(
+                .path(executablePath.path),
+                arguments: [
+                    "serve",
+                    "--dir", dataDirectory.path,
+                    "--http", "127.0.0.1:\(port)"
+                ],
+                output: .redirectToSequence,
+                error: .redirectToSequence
+            ) { execution, standardOutput, standardError in
+
+                // Update state when process starts
+                await MainActor.run { [weak self] in
+                    self?.state = .running
+                    self?.appendLog("Server is running at http://127.0.0.1:\(self?.port ?? 8090)")
+                    self?.appendLog("Admin UI: http://127.0.0.1:\(self?.port ?? 8090)/_/")
+                }
+
+                // Stream stdout
+                async let stdoutTask: Void = {
+                    for try await line in standardOutput.lines {
+                        await MainActor.run { [weak self] in
+                            self?.appendLog(line)
+                        }
+                    }
+                }()
+
+                // Stream stderr
+                async let stderrTask: Void = {
+                    for try await line in standardError.lines {
+                        await MainActor.run { [weak self] in
+                            self?.appendLog(line, isError: true)
+                        }
+                    }
+                }()
+
+                // Wait for both to complete
+                _ = try await (stdoutTask, stderrTask)
+            }
+
+            // Process ended normally
+            await MainActor.run { [weak self] in
+                self?.state = .stopped
+                self?.appendLog("Server stopped")
+            }
+
+        } catch is CancellationError {
+            await MainActor.run { [weak self] in
+                self?.state = .stopped
+                self?.appendLog("Server stopped")
+            }
+        } catch {
+            await MainActor.run { [weak self] in
+                self?.state = .error(error.localizedDescription)
+                self?.appendLog("Server error: \(error.localizedDescription)", isError: true)
+            }
+        }
+    }
+
     /// Stop the PocketBase server
-    func stop() {
+    func stop() async {
         guard state.canStop else {
             appendLog("Cannot stop server in current state", isError: true)
             return
@@ -207,31 +255,21 @@ final class PocketBaseServerManager {
         state = .stopping
         appendLog("Stopping PocketBase server...")
 
-        // Send SIGTERM for graceful shutdown
-        process?.terminate()
+        // Cancel the server task
+        serverTask?.cancel()
+        serverTask = nil
 
-        // Give it a few seconds to shutdown gracefully
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self = self else { return }
-            if self.process?.isRunning == true {
-                self.appendLog("Force killing server...", isError: true)
-                self.process?.interrupt()
-            }
+        // Give it a moment to stop gracefully
+        try? await Task.sleep(for: .milliseconds(500))
+
+        if state == .stopping {
+            state = .stopped
         }
     }
 
     /// Clear all logs
     func clearLogs() {
         logs.removeAll()
-    }
-
-    private func processOutput(_ output: String, isError: Bool) {
-        let lines = output.components(separatedBy: .newlines)
-            .filter { !$0.isEmpty }
-
-        for line in lines {
-            appendLog(line, isError: isError)
-        }
     }
 
     private func appendLog(_ message: String, isError: Bool = false) {
@@ -248,34 +286,44 @@ final class PocketBaseServerManager {
         }
     }
 
-    private func handleTermination(exitCode: Int32) {
-        // Clean up pipes
-        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
-        stderrPipe?.fileHandleForReading.readabilityHandler = nil
-        stdoutPipe = nil
-        stderrPipe = nil
-        process = nil
+    enum ServerError: LocalizedError {
+        case downloadFailed(String)
+        case extractionFailed(String)
+        case startFailed(String)
 
-        if exitCode == 0 {
-            state = .stopped
-            appendLog("Server stopped")
-        } else if case .stopping = state {
-            state = .stopped
-            appendLog("Server stopped (exit code: \(exitCode))")
-        } else {
-            state = .error("Server exited unexpectedly")
-            appendLog("Server exited unexpectedly with code: \(exitCode)", isError: true)
+        var errorDescription: String? {
+            switch self {
+            case .downloadFailed(let msg): return msg
+            case .extractionFailed(let msg): return msg
+            case .startFailed(let msg): return msg
+            }
         }
     }
+}
 
+// MARK: - ProcessInfo Extension
+
+extension ProcessInfo {
+    var machineArchitecture: String {
+        var sysinfo = utsname()
+        uname(&sysinfo)
+        let machine = withUnsafePointer(to: &sysinfo.machine) {
+            $0.withMemoryRebound(to: CChar.self, capacity: 1) {
+                String(cString: $0)
+            }
+        }
+        return machine
+    }
 }
 
 // MARK: - Environment Key
 
+@available(macOS 15.0, *)
 private struct PocketBaseServerManagerKey: EnvironmentKey {
     static let defaultValue: PocketBaseServerManager? = nil
 }
 
+@available(macOS 15.0, *)
 extension EnvironmentValues {
     var serverManager: PocketBaseServerManager? {
         get { self[PocketBaseServerManagerKey.self] }

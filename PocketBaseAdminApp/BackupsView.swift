@@ -274,7 +274,9 @@ struct BackupsView: View {
     private func downloadBackup(_ backup: BackupModel) async {
         let url = await pocketbase.admin.backups.downloadURL(name: backup.key)
         #if os(macOS)
-        await NSWorkspace.shared.open(url)
+        await MainActor.run {
+            _ = NSWorkspace.shared.open(url)
+        }
         #else
         await UIApplication.shared.open(url)
         #endif

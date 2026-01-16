@@ -16,7 +16,12 @@ import PocketBaseIntents
 @main
 struct PocketBaseAdminApp: App {
     #if os(macOS)
-    @State private var serverManager = PocketBaseServerManager()
+    @State private var serverManager: AnyObject? = {
+        if #available(macOS 15.0, *) {
+            return PocketBaseServerManager()
+        }
+        return nil
+    }()
     #endif
 
     init() {
@@ -37,7 +42,7 @@ struct PocketBaseAdminApp: App {
                 .pocketbase(url: URL(string: "https://api.pocketbase.app")!)
 #endif
 #if os(macOS)
-                .environment(\.serverManager, serverManager)
+                .modifier(ServerManagerModifier(serverManager: serverManager))
 #endif
         }
 #if os(macOS)
@@ -46,7 +51,9 @@ struct PocketBaseAdminApp: App {
         .commands {
             AppCommands()
             #if os(macOS)
-            ServerCommands()
+            if #available(macOS 15.0, *) {
+                ServerCommands()
+            }
             #endif
             InspectorCommands()
             SidebarCommands()
@@ -56,6 +63,21 @@ struct PocketBaseAdminApp: App {
         }
     }
 }
+
+#if os(macOS)
+/// View modifier to inject server manager into environment
+struct ServerManagerModifier: ViewModifier {
+    let serverManager: AnyObject?
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *), let manager = serverManager as? PocketBaseServerManager {
+            content.environment(\.serverManager, manager)
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 /// Root view that handles admin authentication state
 struct AdminRootView: View {
@@ -69,7 +91,11 @@ struct AdminRootView: View {
                 ProgressView("Checking authentication...")
             } else if isAuthenticated {
                 #if os(macOS)
-                ConsoleContainerView(onLogout: logout)
+                if #available(macOS 15.0, *) {
+                    ConsoleContainerView(onLogout: logout)
+                } else {
+                    ContentView(onLogout: logout)
+                }
                 #else
                 ContentView(onLogout: logout)
                 #endif

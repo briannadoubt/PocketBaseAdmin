@@ -9,6 +9,7 @@
 import SwiftUI
 
 /// Main view container with collapsible console pane using native VSplitView
+@available(macOS 15.0, *)
 struct ConsoleContainerView: View {
     var onLogout: (() -> Void)?
 
@@ -52,7 +53,9 @@ struct ConsoleContainerView: View {
                 .help("Start PocketBase Server")
 
                 Button {
-                    serverManager?.stop()
+                    Task {
+                        await serverManager?.stop()
+                    }
                 } label: {
                     Label("Stop Server", systemImage: "stop.fill")
                 }
@@ -100,13 +103,16 @@ struct ConsoleContainerView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .stopServer)) { _ in
-            serverManager?.stop()
+            Task {
+                await serverManager?.stop()
+            }
         }
     }
 }
 
 // MARK: - Server Status Indicator
 
+@available(macOS 15.0, *)
 struct ServerStatusIndicator: View {
     @Environment(\.serverManager) private var serverManager
 
@@ -154,6 +160,7 @@ struct ServerStatusIndicator: View {
 
 // MARK: - Console Pane
 
+@available(macOS 15.0, *)
 struct ConsolePane: View {
     @Environment(\.serverManager) private var serverManager
 
@@ -212,6 +219,7 @@ struct ConsolePane: View {
     }
 }
 
+@available(macOS 15.0, *)
 #Preview {
     ConsoleContainerView()
         .frame(width: 1000, height: 700)
