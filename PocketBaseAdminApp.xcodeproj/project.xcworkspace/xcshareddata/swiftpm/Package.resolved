@@ -37,15 +37,6 @@
       }
     },
     {
-      "identity" : "keypathiterable",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/briannadoubt/KeyPathIterable.git",
-      "state" : {
-        "revision" : "c76b8aefd017f0583f86c46dcaa1cbd527c056fa",
-        "version" : "0.1.1"
-      }
-    },
-    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
@@ -232,15 +223,6 @@
       "state" : {
         "revision" : "1983448fefc717a2bc2ebde5490fe99873c5b8a6",
         "version" : "1.2.1"
-      }
-    },
-    {
-      "identity" : "swift-subprocess",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-subprocess",
-      "state" : {
-        "revision" : "44922dfe46380cd354ca4b0208e717a3e92b13dd",
-        "version" : "0.2.1"
       }
     },
     {

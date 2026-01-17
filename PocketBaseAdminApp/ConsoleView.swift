@@ -7,13 +7,12 @@
 
 #if os(macOS)
 import SwiftUI
+import AppKit
 
-/// Console view displaying PocketBase server logs
+/// Console view displaying PocketBase server logs with full text selection
 @available(macOS 15.0, *)
 struct ConsoleView: View {
     @Environment(\.serverManager) private var serverManager
-
-    @State private var autoScroll = true
 
     private var logs: [PocketBaseServerManager.LogEntry] {
         serverManager?.logs ?? []
@@ -24,7 +23,7 @@ struct ConsoleView: View {
             if logs.isEmpty {
                 emptyState
             } else {
-                logList
+                ConsoleTextView(logs: logs)
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
@@ -38,66 +37,102 @@ struct ConsoleView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-
-    private var logList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(logs) { entry in
-                        LogEntryRow(entry: entry)
-                            .id(entry.id)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            }
-            .onChange(of: logs.count) { _, _ in
-                if autoScroll, let lastLog = logs.last {
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        proxy.scrollTo(lastLog.id, anchor: .bottom)
-                    }
-                }
-            }
-        }
-    }
 }
 
+/// NSTextView wrapper for console output with multi-line selection
 @available(macOS 15.0, *)
-struct LogEntryRow: View {
-    let entry: PocketBaseServerManager.LogEntry
+struct ConsoleTextView: NSViewRepresentable {
+    let logs: [PocketBaseServerManager.LogEntry]
 
-    @State private var isHovering = false
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(entry.formattedTimestamp)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 90, alignment: .leading)
+        // Configure text view for console-like appearance
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.backgroundColor = .textBackgroundColor
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
 
-            Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(entry.isError ? .red : .primary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        // Allow horizontal scrolling for long lines
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        // Check if we should auto-scroll (if already at bottom)
+        let wasAtBottom = isScrolledToBottom(scrollView)
+
+        // Build attributed string with colored output
+        let attributedString = buildAttributedString(from: logs)
+
+        // Update text
+        textView.textStorage?.setAttributedString(attributedString)
+
+        // Auto-scroll to bottom if we were already there
+        if wasAtBottom {
+            textView.scrollToEndOfDocument(nil)
         }
-        .padding(.vertical, 2)
-        .padding(.horizontal, 4)
-        .background(isHovering ? Color.accentColor.opacity(0.1) : Color.clear)
-        .cornerRadius(2)
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .contextMenu {
-            Button("Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(entry.message, forType: .string)
+    }
+
+    private func isScrolledToBottom(_ scrollView: NSScrollView) -> Bool {
+        guard let documentView = scrollView.documentView else { return true }
+        let visibleRect = scrollView.contentView.bounds
+        let documentHeight = documentView.frame.height
+        // Consider "at bottom" if within 50 points of the bottom
+        return visibleRect.maxY >= documentHeight - 50
+    }
+
+    private func buildAttributedString(from logs: [PocketBaseServerManager.LogEntry]) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+
+        let timestampAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+
+        let normalAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .foregroundColor: NSColor.labelColor
+        ]
+
+        let errorAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+            .foregroundColor: NSColor.systemRed
+        ]
+
+        for (index, entry) in logs.enumerated() {
+            // Add timestamp
+            let timestamp = NSAttributedString(
+                string: entry.formattedTimestamp + "  ",
+                attributes: timestampAttributes
+            )
+            result.append(timestamp)
+
+            // Add message with appropriate color
+            let message = NSAttributedString(
+                string: entry.message,
+                attributes: entry.isError ? errorAttributes : normalAttributes
+            )
+            result.append(message)
+
+            // Add newline (except for last entry)
+            if index < logs.count - 1 {
+                result.append(NSAttributedString(string: "\n"))
             }
-            Button("Copy with Timestamp") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("[\(entry.formattedTimestamp)] \(entry.message)", forType: .string)
-            }
         }
+
+        return result
     }
 }
 

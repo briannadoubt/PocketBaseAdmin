@@ -8,7 +8,7 @@
 #if os(macOS)
 import Foundation
 import SwiftUI
-import Subprocess
+import Darwin
 
 /// Manages the lifecycle of a local PocketBase server instance
 @available(macOS 15.0, *)
@@ -41,10 +41,25 @@ final class PocketBaseServerManager {
             default: return false
             }
         }
+
+        var displayName: String {
+            switch self {
+            case .stopped: return "Stopped"
+            case .starting: return "Starting..."
+            case .running: return "Running"
+            case .stopping: return "Stopping..."
+            case .downloading: return "Downloading..."
+            case .error(let message): return "Error: \(message)"
+            }
+        }
     }
 
     /// Current state of the server
-    private(set) var state: ServerState = .stopped
+    private(set) var state: ServerState = .stopped {
+        didSet {
+            print("[ServerManager] State changed: \(oldValue.displayName) -> \(state.displayName)")
+        }
+    }
 
     /// Console output logs
     private(set) var logs: [LogEntry] = []
@@ -54,6 +69,9 @@ final class PocketBaseServerManager {
 
     /// Task running the server process
     private var serverTask: Task<Void, Never>?
+
+    /// Time when server was last started (for detecting immediate crashes)
+    private var serverStartTime: Date?
 
     /// Data directory for persistence
     var dataDirectory: URL {
@@ -97,20 +115,42 @@ final class PocketBaseServerManager {
         try? FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
     }
 
-    /// Check if PocketBase is installed
-    private var isPocketBaseInstalled: Bool {
-        FileManager.default.isExecutableFile(atPath: executablePath.path)
+    /// Path to version file tracking installed version
+    private var versionFilePath: URL {
+        binDirectory.appendingPathComponent(".version")
     }
 
-    /// Download PocketBase if not installed
+    /// Check if PocketBase is installed with correct version
+    private var isPocketBaseInstalled: Bool {
+        // Check if binary exists
+        guard FileManager.default.fileExists(atPath: executablePath.path) else {
+            return false
+        }
+        // Check if version matches
+        guard let installedVersion = try? String(contentsOf: versionFilePath, encoding: .utf8),
+              installedVersion.trimmingCharacters(in: .whitespacesAndNewlines) == pocketbaseVersion else {
+            return false
+        }
+        return true
+    }
+
+    /// Save the installed version to a file
+    private func saveInstalledVersion() {
+        try? pocketbaseVersion.write(to: versionFilePath, atomically: true, encoding: .utf8)
+    }
+
+    /// Download PocketBase if not installed or outdated
     private func ensurePocketBaseInstalled() async throws {
         if isPocketBaseInstalled {
-            appendLog("PocketBase binary found")
+            appendLog("PocketBase v\(pocketbaseVersion) already installed")
             return
         }
 
+        // Check if we just need to update vs fresh install
+        let isUpdate = FileManager.default.fileExists(atPath: executablePath.path)
+
         state = .downloading
-        appendLog("Downloading PocketBase v\(pocketbaseVersion)...")
+        appendLog(isUpdate ? "Updating to PocketBase v\(pocketbaseVersion)..." : "Downloading PocketBase v\(pocketbaseVersion)...")
 
         // Determine architecture
         let arch = ProcessInfo.processInfo.machineArchitecture
@@ -134,12 +174,14 @@ final class PocketBaseServerManager {
         // Unzip using ditto (macOS built-in)
         appendLog("Extracting PocketBase...")
 
-        let unzipResult = try await Subprocess.run(
-            .path("/usr/bin/ditto"),
-            arguments: ["-xk", tempZipURL.path, binDirectory.path]
-        )
+        let dittoProcess = Process()
+        dittoProcess.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        dittoProcess.arguments = ["-xk", tempZipURL.path, binDirectory.path]
 
-        guard unzipResult.terminationStatus.isSuccess else {
+        try dittoProcess.run()
+        dittoProcess.waitUntilExit()
+
+        guard dittoProcess.terminationStatus == 0 else {
             throw ServerError.extractionFailed("Failed to extract PocketBase")
         }
 
@@ -149,8 +191,24 @@ final class PocketBaseServerManager {
             ofItemAtPath: executablePath.path
         )
 
+        // Remove quarantine attribute (macOS Gatekeeper)
+        appendLog("Removing quarantine attribute...")
+        let quarantineResult = unsafe removexattr(
+            executablePath.path,
+            "com.apple.quarantine",
+            0
+        )
+        if quarantineResult == 0 {
+            appendLog("Quarantine attribute removed")
+        } else {
+            appendLog("Note: Could not remove quarantine (errno: \(errno)) - may need manual approval")
+        }
+
         // Cleanup
         try? FileManager.default.removeItem(at: tempZipURL)
+
+        // Save installed version
+        saveInstalledVersion()
 
         appendLog("PocketBase v\(pocketbaseVersion) installed successfully")
     }
@@ -183,70 +241,176 @@ final class PocketBaseServerManager {
         }
     }
 
-    /// Run the server process and stream output
-    private func runServer() async {
+    /// The running process
+    private var process: Process?
+
+    /// Pipes for process I/O (must be retained while process runs)
+    private var stdoutPipe: Pipe?
+    private var stderrPipe: Pipe?
+
+    /// Check if the port is already in use
+    private func isPortInUse() -> Bool {
+        let checkProcess = Process()
+        checkProcess.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        checkProcess.arguments = ["-i", ":\(port)", "-sTCP:LISTEN"]
+
+        let pipe = Pipe()
+        checkProcess.standardOutput = pipe
+        checkProcess.standardError = FileHandle.nullDevice
+
         do {
-            try await Subprocess.run(
-                .path(executablePath.path),
-                arguments: [
-                    "serve",
-                    "--dir", dataDirectory.path,
-                    "--http", "127.0.0.1:\(port)"
-                ],
-                output: .redirectToSequence,
-                error: .redirectToSequence
-            ) { execution, standardOutput, standardError in
-
-                // Update state when process starts
-                await MainActor.run { [weak self] in
-                    self?.state = .running
-                    self?.appendLog("Server is running at http://127.0.0.1:\(self?.port ?? 8090)")
-                    self?.appendLog("Admin UI: http://127.0.0.1:\(self?.port ?? 8090)/_/")
-                }
-
-                // Stream stdout
-                async let stdoutTask: Void = {
-                    for try await line in standardOutput.lines {
-                        await MainActor.run { [weak self] in
-                            self?.appendLog(line)
-                        }
-                    }
-                }()
-
-                // Stream stderr
-                async let stderrTask: Void = {
-                    for try await line in standardError.lines {
-                        await MainActor.run { [weak self] in
-                            self?.appendLog(line, isError: true)
-                        }
-                    }
-                }()
-
-                // Wait for both to complete
-                _ = try await (stdoutTask, stderrTask)
-            }
-
-            // Process ended normally
-            await MainActor.run { [weak self] in
-                self?.state = .stopped
-                self?.appendLog("Server stopped")
-            }
-
-        } catch is CancellationError {
-            await MainActor.run { [weak self] in
-                self?.state = .stopped
-                self?.appendLog("Server stopped")
-            }
+            try checkProcess.run()
+            checkProcess.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return !data.isEmpty
         } catch {
-            await MainActor.run { [weak self] in
-                self?.state = .error(error.localizedDescription)
-                self?.appendLog("Server error: \(error.localizedDescription)", isError: true)
+            return false
+        }
+    }
+
+    /// Kill any existing process on our port
+    private func killExistingProcess() {
+        let killProcess = Process()
+        killProcess.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        killProcess.arguments = ["-f", "pocketbase.*:\(port)"]
+        killProcess.standardOutput = FileHandle.nullDevice
+        killProcess.standardError = FileHandle.nullDevice
+
+        try? killProcess.run()
+        killProcess.waitUntilExit()
+
+        // Give it a moment to release the port
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    /// Run the server process and stream output using Foundation's Process
+    private func runServer() async {
+        // Check if port is already in use and kill existing process
+        if isPortInUse() {
+            appendLog("Port \(port) is already in use, killing existing process...")
+            killExistingProcess()
+
+            // Check again
+            if isPortInUse() {
+                state = .error("Port \(port) is still in use after attempting to kill existing process")
+                appendLog("Failed to free port \(port)", isError: true)
+                return
             }
+            appendLog("Port \(port) is now free")
+        }
+
+        // Log paths for debugging
+        appendLog("Executable: \(executablePath.path)")
+        appendLog("Data dir: \(dataDirectory.path)")
+        appendLog("Exists: \(FileManager.default.fileExists(atPath: executablePath.path))")
+
+        let process = Process()
+        let execURL = URL(fileURLWithPath: executablePath.path)
+        process.executableURL = execURL
+        process.currentDirectoryURL = binDirectory
+        process.arguments = [
+            "serve",
+            "--dir", dataDirectory.path,
+            "--http", "127.0.0.1:\(port)"
+        ]
+
+        appendLog("Using executable URL: \(execURL.path)")
+        appendLog("File exists at URL: \(FileManager.default.fileExists(atPath: execURL.path))")
+
+        // Set up pipes for stdout and stderr (stored as instance vars to prevent deallocation)
+        let stdout = Pipe()
+        let stderr = Pipe()
+        self.stdoutPipe = stdout
+        self.stderrPipe = stderr
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        // Set stdin to null device to prevent EOF-related exits
+        process.standardInput = FileHandle.nullDevice
+
+        // Store process reference for stopping
+        self.process = process
+
+        do {
+            try process.run()
+
+            // Track start time for crash detection
+            serverStartTime = Date()
+
+            // Update state
+            state = .running
+            appendLog("Server is running at http://127.0.0.1:\(port)")
+            appendLog("Admin UI: http://127.0.0.1:\(port)/_/")
+
+            // Stream output in background tasks
+            let stdoutHandle = stdout.fileHandleForReading
+            let stderrHandle = stderr.fileHandleForReading
+
+            // Read stdout in background
+            Task { @MainActor [weak self] in
+                do {
+                    for try await line in stdoutHandle.bytes.lines {
+                        self?.appendLog(line)
+                    }
+                } catch {
+                    // Stream closed
+                }
+            }
+
+            // Read stderr in background
+            Task { @MainActor [weak self] in
+                do {
+                    for try await line in stderrHandle.bytes.lines {
+                        self?.appendLog(line, isError: true)
+                    }
+                } catch {
+                    // Stream closed
+                }
+            }
+
+            // Handle process termination asynchronously
+            process.terminationHandler = { [weak self] terminatedProcess in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.process = nil
+                    self.stdoutPipe = nil
+                    self.stderrPipe = nil
+
+                    let exitCode = terminatedProcess.terminationStatus
+                    let terminationReason = terminatedProcess.terminationReason
+                    let wasRunning = self.state == .running
+                    let wasStopping = self.state == .stopping
+
+                    // Check if this was an immediate crash (within 5 seconds of starting)
+                    let timeSinceStart = self.serverStartTime.map { Date().timeIntervalSince($0) } ?? 0
+                    let crashedImmediately = wasRunning && timeSinceStart < 5.0 && exitCode != 0
+
+                    print("[ServerManager] Process terminated - exitCode: \(exitCode), reason: \(terminationReason.rawValue), timeSinceStart: \(timeSinceStart)s, wasRunning: \(wasRunning), wasStopping: \(wasStopping)")
+
+                    if crashedImmediately {
+                        self.state = .error("Server crashed immediately (exit code: \(exitCode)). Check console for details.")
+                        self.appendLog("Server crashed immediately after starting (exit code: \(exitCode))", isError: true)
+                    } else if wasRunning || wasStopping {
+                        self.state = .stopped
+                        self.appendLog("Server stopped (exit code: \(exitCode), reason: \(terminationReason == .exit ? "normal" : "signal"))")
+                    }
+
+                    self.serverStartTime = nil
+                }
+            }
+
+        } catch {
+            self.process = nil
+            state = .error(error.localizedDescription)
+            appendLog("Failed to start server: \(error.localizedDescription)", isError: true)
+            appendLog("Error type: \(type(of: error))", isError: true)
         }
     }
 
     /// Stop the PocketBase server
     func stop() async {
+        print("[ServerManager] stop() called - current state: \(state.displayName)")
+
         guard state.canStop else {
             appendLog("Cannot stop server in current state", isError: true)
             return
@@ -254,6 +418,14 @@ final class PocketBaseServerManager {
 
         state = .stopping
         appendLog("Stopping PocketBase server...")
+
+        // Clear start time to prevent false crash detection
+        serverStartTime = nil
+
+        // Terminate the process
+        if let process = process, process.isRunning {
+            process.terminate()
+        }
 
         // Cancel the server task
         serverTask?.cancel()
@@ -264,6 +436,9 @@ final class PocketBaseServerManager {
 
         if state == .stopping {
             state = .stopped
+            process = nil
+            stdoutPipe = nil
+            stderrPipe = nil
         }
     }
 
@@ -305,14 +480,11 @@ final class PocketBaseServerManager {
 
 extension ProcessInfo {
     var machineArchitecture: String {
-        var sysinfo = utsname()
-        uname(&sysinfo)
-        let machine = withUnsafePointer(to: &sysinfo.machine) {
-            $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                String(cString: $0)
-            }
-        }
-        return machine
+        #if arch(arm64)
+        return "arm64"
+        #else
+        return "x86_64"
+        #endif
     }
 }
 
