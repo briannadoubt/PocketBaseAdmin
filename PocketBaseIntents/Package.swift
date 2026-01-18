@@ -18,7 +18,8 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            path: "../../PocketBase"
+            url: "https://github.com/briannadoubt/pocketbase",
+            .upToNextMajor(from: "0.2.3")
         ),
         .package(
             url: "https://github.com/kishikawakatsumi/KeychainAccess",
@@ -29,8 +30,8 @@ let package = Package(
         .target(
             name: "PocketBaseIntents",
             dependencies: [
-                .product(name: "PocketBase", package: "PocketBase"),
-                .product(name: "PocketBaseAdmin", package: "PocketBase"),
+                .product(name: "PocketBase", package: "pocketbase"),
+                .product(name: "PocketBaseAdmin", package: "pocketbase"),
                 .product(name: "KeychainAccess", package: "KeychainAccess")
             ]
         ),
