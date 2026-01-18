@@ -7,6 +7,7 @@
 
 import Foundation
 import UserNotifications
+import OSLog
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
@@ -21,6 +22,8 @@ import PocketBaseIntents
 @MainActor
 public final class BackgroundTaskManager {
     public static let shared = BackgroundTaskManager()
+
+    private let logger = Logger(subsystem: "PocketBaseAdminApp", category: "BackgroundTaskManager")
 
     // Task identifiers
     private let healthCheckTaskIdentifier = "com.briannadoubt.PocketBaseAdmin.healthcheck"
@@ -58,7 +61,12 @@ public final class BackgroundTaskManager {
             using: nil
         ) { task in
             Task { @MainActor in
-                await self.handleHealthCheckTask(task as! BGAppRefreshTask)
+                guard let refreshTask = task as? BGAppRefreshTask else {
+                    self.logger.error("Health check task received unexpected task type")
+                    task.setTaskCompleted(success: false)
+                    return
+                }
+                await self.handleHealthCheckTask(refreshTask)
             }
         }
 
@@ -68,7 +76,12 @@ public final class BackgroundTaskManager {
             using: nil
         ) { task in
             Task { @MainActor in
-                await self.handleBackupReminderTask(task as! BGAppRefreshTask)
+                guard let refreshTask = task as? BGAppRefreshTask else {
+                    self.logger.error("Backup reminder task received unexpected task type")
+                    task.setTaskCompleted(success: false)
+                    return
+                }
+                await self.handleBackupReminderTask(refreshTask)
             }
         }
 
@@ -88,7 +101,7 @@ public final class BackgroundTaskManager {
                 await registerNotificationCategories()
             }
         } catch {
-            print("Notification permission error: \(error)")
+            logger.error("Notification permission error: \(error.localizedDescription)")
         }
     }
 
@@ -231,7 +244,7 @@ public final class BackgroundTaskManager {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("Failed to schedule health check: \(error)")
+            logger.error("Failed to schedule health check: \(error.localizedDescription)")
         }
     }
 
@@ -244,7 +257,7 @@ public final class BackgroundTaskManager {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("Failed to schedule backup reminder: \(error)")
+            logger.error("Failed to schedule backup reminder: \(error.localizedDescription)")
         }
     }
     #endif
@@ -268,7 +281,7 @@ public final class BackgroundTaskManager {
         do {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
-            print("Failed to send notification: \(error)")
+            logger.error("Failed to send server down notification: \(error.localizedDescription)")
         }
     }
 
@@ -289,7 +302,7 @@ public final class BackgroundTaskManager {
         do {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
-            print("Failed to send notification: \(error)")
+            logger.error("Failed to send server recovered notification: \(error.localizedDescription)")
         }
     }
 
@@ -318,7 +331,7 @@ public final class BackgroundTaskManager {
         do {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
-            print("Failed to send notification: \(error)")
+            logger.error("Failed to send backup reminder notification: \(error.localizedDescription)")
         }
     }
 
@@ -340,7 +353,7 @@ public final class BackgroundTaskManager {
         do {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
-            print("Failed to send notification: \(error)")
+            logger.error("Failed to send error alert notification: \(error.localizedDescription)")
         }
     }
 
@@ -384,7 +397,7 @@ extension BackgroundTaskManager {
                 let intent = CreateBackupIntent()
                 _ = try await intent.perform()
             } catch {
-                print("Failed to create backup from notification: \(error)")
+                logger.error("Failed to create backup from notification: \(error.localizedDescription)")
             }
             #endif
         case .viewLogs:

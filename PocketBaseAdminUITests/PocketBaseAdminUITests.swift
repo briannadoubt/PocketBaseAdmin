@@ -29,7 +29,27 @@ final class PocketBaseAdminUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        
+        // Wait for login view to appear
+        let emailField = app.textFields["admin@example.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+
+        // Type email
+        emailField.tap()
+        emailField.typeText("fake@fake.com")
+
+        // Type password
+        let passwordField = app.secureTextFields["••••••••"]
+        passwordField.tap()
+        passwordField.typeText("Test123456")
+
+        // Tap Sign In button
+        let signInButton = app.buttons["Sign In"]
+        XCTAssertTrue(signInButton.isEnabled)
+        signInButton.tap()
+
+        // Wait for the main content to load (Collections tab should appear)
+        let collectionsTab = app.buttons["Collections"]
+        XCTAssertTrue(collectionsTab.waitForExistence(timeout: 10))
     }
 
     @MainActor

@@ -23,7 +23,7 @@ struct CollectionsList: View {
     @Binding var selection: String?
 
     @State private var searchQuery: String = ""
-    @State private var isSystemExpanded: Bool = false
+    @State private var isSystemExpanded: Bool = true
     @State private var showNewCollectionEditor = false
     @State private var collectionToEdit: CollectionModel?
     @State private var collectionToDelete: CollectionModel?

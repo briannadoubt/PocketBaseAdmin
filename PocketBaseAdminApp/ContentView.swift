@@ -8,6 +8,9 @@
 import SwiftUI
 import PocketBase
 import PocketBaseAdmin
+import OSLog
+
+private let logger = Logger(subsystem: "PocketBaseAdminApp", category: "ContentView")
 
 extension CollectionModelType {
     var image: ImageResource {
@@ -28,13 +31,6 @@ extension EnvironmentValues {
 #endif
 }
 
-struct NavigationGroup: View {
-    
-    var body: some View {
-        
-    }
-}
-
 struct ContentView: View {
     var onLogout: (() -> Void)?
     var onSwitchConnection: (() -> Void)?
@@ -46,6 +42,8 @@ struct ContentView: View {
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    /// Persists user's tab customization preferences (tab order, visibility, etc.)
+    /// Version 2: Updated to use new TabSection structure with system/sync/auth groupings
     @AppStorage("io.pocketbase.admin.tabCustomization.v2") var tabCustomization = TabViewCustomization()
 
     @State private var selectedTab: String?
@@ -57,6 +55,18 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            // Dashboard tab - first for prominence
+            Tab(value: AdminTab.dashboard.rawValue) {
+                NavigationStack {
+                    DashboardView()
+                }
+            } label: {
+                AdminTab.dashboard.label
+            }
+            #if !os(macOS)
+            .customizationBehavior(.disabled, for: .tabBar, .sidebar)
+            #endif
+
             if horizontalSizeClass == .compact {
                 Tab(value: AdminTab.collections.rawValue) {
                     NavigationStack {
@@ -232,8 +242,10 @@ struct ContentView: View {
                 #if !os(macOS)
                 .customizationBehavior(.disabled, for: .tabBar, .sidebar)
                 #endif
-            } else {
-                
+            }
+
+#if !os(macOS)
+            if horizontalSizeClass != .compact {
                 TabSection("System") {
                     Tab(value: SettingsScreen.application.rawValue) {
                         NavigationStack {
@@ -243,7 +255,7 @@ struct ContentView: View {
                         SettingsScreen.application.label
                     }
                     .customizationID(SettingsScreen.application.rawValue)
-                    
+
                     Tab(value: SettingsScreen.mail.rawValue) {
                         NavigationStack {
                             MailSettingsView()
@@ -252,7 +264,7 @@ struct ContentView: View {
                         SettingsScreen.mail.label
                     }
                     .customizationID(SettingsScreen.mail.rawValue)
-                    
+
                     Tab(value: SettingsScreen.files.rawValue) {
                         NavigationStack {
                             FilesSettingsView()
@@ -261,7 +273,7 @@ struct ContentView: View {
                         SettingsScreen.files.label
                     }
                     .customizationID(SettingsScreen.files.rawValue)
-                    
+
                     Tab(value: SettingsScreen.backups.rawValue) {
                         NavigationStack {
                             BackupsView()
@@ -281,7 +293,7 @@ struct ContentView: View {
                     .customizationID(SettingsScreen.health.rawValue)
                 }
                 .customizationID("System")
-                
+
                 TabSection("Sync") {
                     Tab(value: SettingsScreen.exportCollections.rawValue) {
                         NavigationStack {
@@ -291,7 +303,7 @@ struct ContentView: View {
                         SettingsScreen.exportCollections.label
                     }
                     .customizationID(SettingsScreen.exportCollections.rawValue)
-                    
+
                     Tab(value: SettingsScreen.importCollections.rawValue) {
                         NavigationStack {
                             ImportCollectionsView()
@@ -302,7 +314,7 @@ struct ContentView: View {
                     .customizationID(SettingsScreen.importCollections.rawValue)
                 }
                 .customizationID("Sync")
-                
+
                 TabSection("Authentication") {
                     Tab(value: SettingsScreen.authProviders.rawValue) {
                         NavigationStack {
@@ -312,7 +324,7 @@ struct ContentView: View {
                         SettingsScreen.authProviders.label
                     }
                     .customizationID(SettingsScreen.authProviders.rawValue)
-                    
+
                     Tab(value: SettingsScreen.tokenOptions.rawValue) {
                         NavigationStack {
                             TokenOptionsView()
@@ -321,7 +333,7 @@ struct ContentView: View {
                         SettingsScreen.tokenOptions.label
                     }
                     .customizationID(SettingsScreen.tokenOptions.rawValue)
-                    
+
                     Tab(value: SettingsScreen.admins.rawValue) {
                         NavigationStack {
                             AdminsView()
@@ -333,6 +345,7 @@ struct ContentView: View {
                 }
                 .customizationID("Authentication")
             }
+#endif
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($tabCustomization)
@@ -378,7 +391,7 @@ struct ContentView: View {
             do {
                 try await settings.load(pocketbase: pocketbase)
             } catch {
-                print("Failed to load settings: \(error.localizedDescription)")
+                logger.error("Failed to load settings: \(error.localizedDescription)")
             }
         }
         .sheet(isPresented: $showNewCollectionSheet) {

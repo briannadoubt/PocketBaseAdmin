@@ -10,6 +10,7 @@ import CoreSpotlight
 import UniformTypeIdentifiers
 import PocketBase
 import PocketBaseAdmin
+import OSLog
 #if os(macOS)
 import AppKit
 #else
@@ -23,6 +24,7 @@ public final class SpotlightIndexer {
 
     private let domainIdentifier = "com.briannadoubt.PocketBaseAdmin"
     private let searchableIndex = CSSearchableIndex.default()
+    private let logger = Logger(subsystem: "PocketBaseAdminApp", category: "SpotlightIndexer")
 
     private init() {}
 
@@ -115,9 +117,9 @@ public final class SpotlightIndexer {
 
         do {
             try await searchableIndex.indexSearchableItems(items)
-            print("Spotlight: Indexed \(items.count) collections")
+            logger.info("Indexed \(items.count) collections")
         } catch {
-            print("Spotlight: Failed to index collections: \(error)")
+            logger.error("Failed to index collections: \(error.localizedDescription)")
         }
     }
 
@@ -125,9 +127,9 @@ public final class SpotlightIndexer {
     public func removeCollection(id: String) async {
         do {
             try await searchableIndex.deleteSearchableItems(withIdentifiers: ["collection-\(id)"])
-            print("Spotlight: Removed collection \(id)")
+            logger.info("Removed collection \(id)")
         } catch {
-            print("Spotlight: Failed to remove collection: \(error)")
+            logger.error("Failed to remove collection: \(error.localizedDescription)")
         }
     }
 
@@ -135,9 +137,9 @@ public final class SpotlightIndexer {
     public func removeAllCollections() async {
         do {
             try await searchableIndex.deleteSearchableItems(withDomainIdentifiers: ["\(domainIdentifier).collections"])
-            print("Spotlight: Removed all collections")
+            logger.info("Removed all collections")
         } catch {
-            print("Spotlight: Failed to remove all collections: \(error)")
+            logger.error("Failed to remove all collections: \(error.localizedDescription)")
         }
     }
 
@@ -173,9 +175,9 @@ public final class SpotlightIndexer {
 
         do {
             try await searchableIndex.indexSearchableItems(items)
-            print("Spotlight: Indexed \(items.count) backups")
+            logger.info("Indexed \(items.count) backups")
         } catch {
-            print("Spotlight: Failed to index backups: \(error)")
+            logger.error("Failed to index backups: \(error.localizedDescription)")
         }
     }
 
@@ -183,9 +185,9 @@ public final class SpotlightIndexer {
     public func removeAllBackups() async {
         do {
             try await searchableIndex.deleteSearchableItems(withDomainIdentifiers: ["\(domainIdentifier).backups"])
-            print("Spotlight: Removed all backups")
+            logger.info("Removed all backups")
         } catch {
-            print("Spotlight: Failed to remove all backups: \(error)")
+            logger.error("Failed to remove all backups: \(error.localizedDescription)")
         }
     }
 
@@ -195,9 +197,9 @@ public final class SpotlightIndexer {
     public func deleteAllIndexes() async {
         do {
             try await searchableIndex.deleteAllSearchableItems()
-            print("Spotlight: Deleted all indexes")
+            logger.info("Deleted all indexes")
         } catch {
-            print("Spotlight: Failed to delete all indexes: \(error)")
+            logger.error("Failed to delete all indexes: \(error.localizedDescription)")
         }
     }
 }

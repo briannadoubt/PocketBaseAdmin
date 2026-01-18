@@ -16,14 +16,22 @@ struct CollectionEditorView: View {
     @Environment(\.pocketbase) private var pocketbase
     @Environment(\.dismiss) private var dismiss
 
+    @Environment(CollectionsState.self) private var collectionsState
+
     @State private var name: String = ""
     @State private var type: CollectionModelType = .base
     @State private var fields: [EditableField] = []
-    @State private var listRule: String = ""
-    @State private var viewRule: String = ""
-    @State private var createRule: String = ""
-    @State private var updateRule: String = ""
-    @State private var deleteRule: String = ""
+    @State private var listRule: RuleAccessState = .locked
+    @State private var viewRule: RuleAccessState = .locked
+    @State private var createRule: RuleAccessState = .locked
+    @State private var updateRule: RuleAccessState = .locked
+    @State private var deleteRule: RuleAccessState = .locked
+
+    /// Suggestion provider for API rules autocomplete
+    @State private var ruleSuggestionProvider = RuleSuggestionProvider()
+
+    // View collection specific state
+    @State private var viewQuery: String = ""
 
     // Auth collection email templates
     @State private var verificationSubject: String = ""
@@ -96,55 +104,71 @@ struct CollectionEditorView: View {
                     .disabled(isEditing)
                 }
 
-                Section("Schema") {
-                    if fields.isEmpty {
-                        Text("No fields yet")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(fields.indices, id: \.self) { index in
-                            FieldRow(field: fields[index]) {
-                                fieldEditorMode = .edit(index, fields[index])
+                // View collections show query editor and rules inline
+                if type == .view {
+                    Section {
+                        ViewQueryEditorView(query: $viewQuery)
+                    }
+
+                    Section("API Rules") {
+                        RuleEditor(name: "List/Search", rule: $listRule, suggestionProvider: ruleSuggestionProvider)
+                        RuleEditor(name: "View", rule: $viewRule, suggestionProvider: ruleSuggestionProvider)
+                    }
+                } else {
+                    // Base and Auth collections show Schema and API Rules sections
+                    Section("Schema") {
+                        if fields.isEmpty {
+                            Text("No fields yet")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(fields.indices, id: \.self) { index in
+                                FieldRow(field: fields[index]) {
+                                    fieldEditorMode = .edit(index, fields[index])
+                                }
+                                .disabled(fields[index].system)
                             }
-                            .disabled(fields[index].system)
+                            .onDelete { indexSet in
+                                let indicesToDelete = indexSet.filter { !fields[$0].system }
+                                fields.remove(atOffsets: IndexSet(indicesToDelete))
+                            }
+                            .onMove { from, to in
+                                fields.move(fromOffsets: from, toOffset: to)
+                            }
                         }
-                        .onDelete { indexSet in
-                            let indicesToDelete = indexSet.filter { !fields[$0].system }
-                            fields.remove(atOffsets: IndexSet(indicesToDelete))
-                        }
-                        .onMove { from, to in
-                            fields.move(fromOffsets: from, toOffset: to)
+
+                        Button {
+                            fieldEditorMode = .new
+                        } label: {
+                            Label("New Field", systemImage: "plus.circle.fill")
                         }
                     }
 
-                    Button {
-                        fieldEditorMode = .new
-                    } label: {
-                        Label("New Field", systemImage: "plus.circle.fill")
+                    Section("API Rules") {
+                        RuleEditor(name: "List", rule: $listRule, suggestionProvider: ruleSuggestionProvider)
+                        RuleEditor(name: "View", rule: $viewRule, suggestionProvider: ruleSuggestionProvider)
+                        RuleEditor(name: "Create", rule: $createRule, suggestionProvider: ruleSuggestionProvider)
+                        RuleEditor(name: "Update", rule: $updateRule, suggestionProvider: ruleSuggestionProvider)
+                        RuleEditor(name: "Delete", rule: $deleteRule, suggestionProvider: ruleSuggestionProvider)
                     }
-                }
-
-                Section("API Rules") {
-                    RuleEditor(name: "List", rule: $listRule)
-                    RuleEditor(name: "View", rule: $viewRule)
-                    RuleEditor(name: "Create", rule: $createRule)
-                    RuleEditor(name: "Update", rule: $updateRule)
-                    RuleEditor(name: "Delete", rule: $deleteRule)
                 }
 
                 if type == .auth {
                     Section("Email Templates") {
                         EmailTemplateEditor(
                             title: "Verification",
+                            templateType: .verification,
                             subject: $verificationSubject,
                             bodyText: $verificationBody
                         )
                         EmailTemplateEditor(
                             title: "Password Reset",
+                            templateType: .resetPassword,
                             subject: $resetPasswordSubject,
                             bodyText: $resetPasswordBody
                         )
                         EmailTemplateEditor(
                             title: "Email Change",
+                            templateType: .confirmEmailChange,
                             subject: $confirmEmailChangeSubject,
                             bodyText: $confirmEmailChangeBody
                         )
@@ -156,6 +180,7 @@ struct CollectionEditorView: View {
                         if authAlertEnabled {
                             EmailTemplateEditor(
                                 title: "Alert Email",
+                                templateType: .authAlert,
                                 subject: $authAlertSubject,
                                 bodyText: $authAlertBody
                             )
@@ -198,7 +223,63 @@ struct CollectionEditorView: View {
             }
         }
         .onAppear {
-            initializeFromCollection()
+            if collection == nil {
+                // New collection: initialize with system fields for the default type
+                fields = EditableField.systemFields(for: type)
+            } else {
+                initializeFromCollection()
+            }
+            updateSuggestionProvider()
+        }
+        .onChange(of: type) { _, newValue in
+            // Only update system fields when creating a new collection
+            guard !isEditing else { return }
+            updateSystemFieldsForType(newValue)
+
+            // Initialize default email templates when switching to auth type
+            if newValue == .auth {
+                initializeDefaultEmailTemplates()
+            }
+        }
+        .onChange(of: fields) { _, _ in
+            updateSuggestionProvider()
+        }
+    }
+
+    /// Updates the rule suggestion provider with current fields and collections.
+    private func updateSuggestionProvider() {
+        ruleSuggestionProvider.fields = fields
+        ruleSuggestionProvider.collections = collectionsState.collections.map(\.collection)
+    }
+
+    /// Updates the system fields when the collection type changes (for new collections only)
+    private func updateSystemFieldsForType(_ newType: CollectionModelType) {
+        // Preserve user-defined fields
+        let userFields = fields.filter { !$0.system }
+        // Get new system fields for the selected type
+        let newSystemFields = EditableField.systemFields(for: newType)
+        // Combine: system fields first, then user fields
+        fields = newSystemFields + userFields
+    }
+
+    /// Initializes default email templates for new auth collections
+    private func initializeDefaultEmailTemplates() {
+        // Only set defaults if templates are empty
+        if verificationSubject.isEmpty && verificationBody.isEmpty {
+            verificationSubject = DefaultEmailTemplates.verificationSubject
+            verificationBody = DefaultEmailTemplates.verificationBody
+        }
+        if resetPasswordSubject.isEmpty && resetPasswordBody.isEmpty {
+            resetPasswordSubject = DefaultEmailTemplates.resetPasswordSubject
+            resetPasswordBody = DefaultEmailTemplates.resetPasswordBody
+        }
+        if confirmEmailChangeSubject.isEmpty && confirmEmailChangeBody.isEmpty {
+            confirmEmailChangeSubject = DefaultEmailTemplates.confirmEmailChangeSubject
+            confirmEmailChangeBody = DefaultEmailTemplates.confirmEmailChangeBody
+        }
+        if authAlertSubject.isEmpty && authAlertBody.isEmpty {
+            authAlertSubject = DefaultEmailTemplates.authAlertSubject
+            authAlertBody = DefaultEmailTemplates.authAlertBody
         }
     }
 
@@ -208,11 +289,14 @@ struct CollectionEditorView: View {
         name = collection.name
         type = collection.type
         fields = (collection.schema ?? []).map { EditableField(from: $0) }
-        listRule = collection.listRule ?? ""
-        viewRule = collection.viewRule ?? ""
-        createRule = collection.createRule ?? ""
-        updateRule = collection.updateRule ?? ""
-        deleteRule = collection.deleteRule ?? ""
+        listRule = RuleAccessState(from: collection.listRule)
+        viewRule = RuleAccessState(from: collection.viewRule)
+        createRule = RuleAccessState(from: collection.createRule)
+        updateRule = RuleAccessState(from: collection.updateRule)
+        deleteRule = RuleAccessState(from: collection.deleteRule)
+
+        // View collections: viewQuery support not yet available in PocketBase library
+        // TODO: Add viewQuery loading when library supports it
 
         // Load email templates for auth collections
         if collection.type == .auth {
@@ -233,7 +317,8 @@ struct CollectionEditorView: View {
         errorMessage = nil
         defer { isSaving = false }
 
-        let schemaFields = fields.map { $0.toField() }
+        // Filter out system fields - PocketBase creates these automatically
+        let schemaFields = fields.filter { !$0.system }.map { $0.toField() }
 
         // Build email templates for auth collections
         let verification: EmailTemplate? = type == .auth && (!verificationSubject.isEmpty || !verificationBody.isEmpty)
@@ -256,12 +341,12 @@ struct CollectionEditorView: View {
                 // Update existing collection
                 let request = CollectionUpdateRequest(
                     name: name,
-                    schema: schemaFields,
-                    listRule: listRule.isEmpty ? nil : listRule,
-                    viewRule: viewRule.isEmpty ? nil : viewRule,
-                    createRule: createRule.isEmpty ? nil : createRule,
-                    updateRule: updateRule.isEmpty ? nil : updateRule,
-                    deleteRule: deleteRule.isEmpty ? nil : deleteRule,
+                    schema: type == .view ? nil : schemaFields,
+                    listRule: listRule.apiValue,
+                    viewRule: viewRule.apiValue,
+                    createRule: type == .view ? nil : createRule.apiValue,
+                    updateRule: type == .view ? nil : updateRule.apiValue,
+                    deleteRule: type == .view ? nil : deleteRule.apiValue,
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,
@@ -273,12 +358,12 @@ struct CollectionEditorView: View {
                 let request = CollectionCreateRequest(
                     name: name,
                     type: type,
-                    schema: schemaFields,
-                    listRule: listRule.isEmpty ? nil : listRule,
-                    viewRule: viewRule.isEmpty ? nil : viewRule,
-                    createRule: createRule.isEmpty ? nil : createRule,
-                    updateRule: updateRule.isEmpty ? nil : updateRule,
-                    deleteRule: deleteRule.isEmpty ? nil : deleteRule,
+                    schema: type == .view ? nil : schemaFields,
+                    listRule: listRule.apiValue,
+                    viewRule: viewRule.apiValue,
+                    createRule: type == .view ? nil : createRule.apiValue,
+                    updateRule: type == .view ? nil : updateRule.apiValue,
+                    deleteRule: type == .view ? nil : deleteRule.apiValue,
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,
@@ -302,7 +387,7 @@ struct CollectionEditorView: View {
 }
 
 /// Mutable version of Field for editing purposes
-struct EditableField: Identifiable {
+struct EditableField: Identifiable, Equatable {
     var id: String
     var name: String
     var type: FieldType
@@ -413,6 +498,100 @@ struct EditableField: Identifiable {
             options: options
         )
     }
+
+    /// Returns the system fields for a given collection type.
+    /// These are fields automatically created by PocketBase.
+    static func systemFields(for type: CollectionModelType) -> [EditableField] {
+        switch type {
+        case .base:
+            return baseSystemFields
+        case .auth:
+            return baseSystemFields + authSystemFields
+        case .view:
+            // View collections derive fields from query, no editable system fields
+            return []
+        }
+    }
+
+    /// System fields common to base and auth collections
+    private static var baseSystemFields: [EditableField] {
+        [
+            EditableField(
+                id: "_pb_id_field_",
+                name: "id",
+                type: .primaryKey,
+                system: true,
+                required: true,
+                presentable: false
+            ),
+            EditableField(
+                id: "_pb_created_field_",
+                name: "created",
+                type: .autodate,
+                system: true,
+                required: false,
+                presentable: false,
+                onCreate: true,
+                onUpdate: false
+            ),
+            EditableField(
+                id: "_pb_updated_field_",
+                name: "updated",
+                type: .autodate,
+                system: true,
+                required: false,
+                presentable: false,
+                onCreate: true,
+                onUpdate: true
+            )
+        ]
+    }
+
+    /// Additional system fields for auth collections
+    private static var authSystemFields: [EditableField] {
+        [
+            EditableField(
+                id: "_pb_username_field_",
+                name: "username",
+                type: .text,
+                system: true,
+                required: true,
+                presentable: true
+            ),
+            EditableField(
+                id: "_pb_email_field_",
+                name: "email",
+                type: .email,
+                system: true,
+                required: false,
+                presentable: false
+            ),
+            EditableField(
+                id: "_pb_verified_field_",
+                name: "verified",
+                type: .bool,
+                system: true,
+                required: false,
+                presentable: false
+            ),
+            EditableField(
+                id: "_pb_emailVisibility_field_",
+                name: "emailVisibility",
+                type: .bool,
+                system: true,
+                required: false,
+                presentable: false
+            ),
+            EditableField(
+                id: "_pb_password_field_",
+                name: "password",
+                type: .password,
+                system: true,
+                required: true,
+                presentable: false
+            )
+        ]
+    }
 }
 
 struct FieldRow: View {
@@ -455,63 +634,5 @@ struct FieldRow: View {
             }
         }
         .buttonStyle(.plain)
-    }
-}
-
-struct RuleEditor: View {
-    let name: String
-    @Binding var rule: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(name)
-                Spacer()
-                Text(rule.isEmpty ? "Public" : "Custom")
-                    .font(.caption)
-                    .foregroundStyle(rule.isEmpty ? .green : .orange)
-            }
-            TextField("", text: $rule, prompt: Text("Leave empty for public access"))
-                .font(.system(.body, design: .monospaced))
-                .textFieldStyle(.roundedBorder)
-            #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            #endif
-        }
-    }
-}
-
-struct EmailTemplateEditor: View {
-    let title: String
-    @Binding var subject: String
-    @Binding var bodyText: String
-
-    @State private var isExpanded = false
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 12) {
-                TextField("Subject", text: $subject)
-                    .textFieldStyle(.roundedBorder)
-
-                TextEditor(text: $bodyText)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(minHeight: 80)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                    )
-            }
-            .padding(.vertical, 4)
-        } label: {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(subject.isEmpty && bodyText.isEmpty ? "Default" : "Custom")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 }

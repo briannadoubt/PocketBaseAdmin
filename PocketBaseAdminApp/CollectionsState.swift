@@ -123,15 +123,24 @@ final class CollectionsState {
     }
 }
 
+// MARK: - OrderedDictionary RandomAccessCollection Conformance
+
+/// Extends OrderedDictionary to conform to RandomAccessCollection for use with SwiftUI's ForEach.
+/// This retroactive conformance is required because OrderedDictionary (from swift-collections)
+/// doesn't natively conform to RandomAccessCollection. The @MainActor annotation ensures
+/// thread-safe access when used in SwiftUI views.
+///
+/// Note: Retroactive conformances should generally be avoided, but this is acceptable here
+/// because OrderedDictionary is unlikely to add conflicting conformance in the future.
 extension OrderedDictionary: @retroactive @MainActor RandomAccessCollection {
     public subscript(position: Int) -> (key: Key, value: Value) {
         (elements.keys[position], values[position])
     }
-    
+
     public var startIndex: Int {
         self.values.startIndex
     }
-    
+
     public var endIndex: Int {
         self.values.endIndex
     }

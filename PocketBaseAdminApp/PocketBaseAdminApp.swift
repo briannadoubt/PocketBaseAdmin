@@ -51,6 +51,13 @@ struct PocketBaseAdminApp: App {
         .commands {
             appCommands
         }
+
+#if os(macOS)
+        Settings {
+            SettingsWindowView()
+                .pocketbase(.localhost)
+        }
+#endif
     }
 
     #if os(macOS)
