@@ -83,7 +83,13 @@ final class XPCServerClient {
 
     /// Connect to the XPC service
     func connect() {
-        guard connectionStatus == .disconnected || connectionStatus == .error("") else { return }
+        // Allow connection if disconnected or in any error state (to enable retry after failures)
+        switch connectionStatus {
+        case .disconnected, .error:
+            break
+        case .connecting, .connected:
+            return
+        }
 
         connectionStatus = .connecting
 

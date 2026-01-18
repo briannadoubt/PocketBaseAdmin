@@ -71,13 +71,17 @@ final class ConnectionHub {
             throw ConnectionHubError.duplicateConnection
         }
 
-        connections.append(connection)
-        saveConnections()
+        var newConnection = connection
 
         // Sync to CloudKit if available and not a local-only connection
         if let cloudKitSync, !connection.isLocal {
             try await cloudKitSync.save(connection)
+            // Persist the CloudKit record ID for future sync operations
+            newConnection.cloudKitRecordID = connection.id.uuidString
         }
+
+        connections.append(newConnection)
+        saveConnections()
     }
 
     /// Update an existing connection
@@ -86,13 +90,19 @@ final class ConnectionHub {
             throw ConnectionHubError.connectionNotFound
         }
 
-        connections[index] = connection
-        saveConnections()
+        var updatedConnection = connection
 
         // Sync to CloudKit if available and not a local-only connection
         if let cloudKitSync, !connection.isLocal {
             try await cloudKitSync.save(connection)
+            // Ensure CloudKit record ID is persisted
+            if updatedConnection.cloudKitRecordID == nil {
+                updatedConnection.cloudKitRecordID = connection.id.uuidString
+            }
         }
+
+        connections[index] = updatedConnection
+        saveConnections()
     }
 
     /// Remove a connection
@@ -107,8 +117,9 @@ final class ConnectionHub {
         connections.removeAll { $0.id == connection.id }
         saveConnections()
 
-        // Remove from CloudKit if available
-        if let cloudKitSync, let recordID = connection.cloudKitRecordID {
+        // Remove from CloudKit if available (use connection.id as fallback for record ID)
+        if let cloudKitSync, !connection.isLocal {
+            let recordID = connection.cloudKitRecordID ?? connection.id.uuidString
             try await cloudKitSync.delete(recordID: recordID)
         }
     }
