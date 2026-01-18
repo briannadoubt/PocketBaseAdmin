@@ -295,10 +295,8 @@ struct CollectionEditorView: View {
         updateRule = RuleAccessState(from: collection.updateRule)
         deleteRule = RuleAccessState(from: collection.deleteRule)
 
-        // Load view query for view collections
-        if collection.type == .view {
-            viewQuery = collection.viewQuery ?? ""
-        }
+        // View collections: viewQuery support not yet available in PocketBase library
+        // TODO: Add viewQuery loading when library supports it
 
         // Load email templates for auth collections
         if collection.type == .auth {
@@ -349,7 +347,6 @@ struct CollectionEditorView: View {
                     createRule: type == .view ? nil : createRule.apiValue,
                     updateRule: type == .view ? nil : updateRule.apiValue,
                     deleteRule: type == .view ? nil : deleteRule.apiValue,
-                    viewQuery: type == .view ? viewQuery : nil,
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,
@@ -367,7 +364,6 @@ struct CollectionEditorView: View {
                     createRule: type == .view ? nil : createRule.apiValue,
                     updateRule: type == .view ? nil : updateRule.apiValue,
                     deleteRule: type == .view ? nil : deleteRule.apiValue,
-                    viewQuery: type == .view ? viewQuery : nil,
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,

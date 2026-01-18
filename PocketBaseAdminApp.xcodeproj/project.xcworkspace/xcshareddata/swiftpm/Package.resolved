@@ -1,4 +1,5 @@
 {
+  "originHash" : "b313b80242721734e4e80313815d7a1b86813d53c4f223882d9770da0f6a95cc",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -34,15 +35,6 @@
       "state" : {
         "revision" : "84e546727d66f1adc5439debad16270d0fdd04e7",
         "version" : "4.2.2"
-      }
-    },
-    {
-      "identity" : "keypathiterable",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/briannadoubt/KeyPathIterable.git",
-      "state" : {
-        "revision" : "c76b8aefd017f0583f86c46dcaa1cbd527c056fa",
-        "version" : "0.1.1"
       }
     },
     {
@@ -253,5 +245,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }
