@@ -37,6 +37,8 @@ struct NavigationGroup: View {
 
 struct ContentView: View {
     var onLogout: (() -> Void)?
+    var onSwitchConnection: (() -> Void)?
+    var connectionName: String?
 
     @State private var collectionsState = CollectionsState()
     @State private var settings = Admin.Settings()
@@ -59,6 +61,11 @@ struct ContentView: View {
                 Tab(value: AdminTab.collections.rawValue) {
                     NavigationStack {
                         CollectionsList(selection: $selectedTab)
+                            #if !os(macOS)
+                            .toolbar {
+                                connectionToolbarItem
+                            }
+                            #endif
                     }
                 } label: {
                     AdminTab.collections.label
@@ -195,6 +202,11 @@ struct ContentView: View {
                 Tab(value: AdminTab.logs.rawValue) {
                     NavigationStack {
                         LogsView()
+                            #if !os(macOS)
+                            .toolbar {
+                                connectionToolbarItem
+                            }
+                            #endif
                     }
                 } label: {
                     AdminTab.logs.label
@@ -203,11 +215,16 @@ struct ContentView: View {
                 .customizationBehavior(.disabled, for: .tabBar, .sidebar)
                 #endif
             }
-            
+
             if horizontalSizeClass == .compact {
                 Tab(value: AdminTab.settings.rawValue) {
                     NavigationStack {
                         SettingsView(selection: $selectedTab)
+                            #if !os(macOS)
+                            .toolbar {
+                                connectionToolbarItem
+                            }
+                            #endif
                     }
                 } label: {
                     AdminTab.settings.label
@@ -320,6 +337,17 @@ struct ContentView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($tabCustomization)
         .tabViewSidebarHeader {
+            #if !os(macOS)
+            if let onSwitchConnection {
+                Button {
+                    onSwitchConnection()
+                } label: {
+                    Label(connectionName ?? "Connection", systemImage: "externaldrive")
+                }
+                .buttonStyle(.borderless)
+            }
+            #endif
+
             Button {
                 showNewCollectionSheet = true
             } label: {
@@ -419,6 +447,21 @@ struct ContentView: View {
         // User will need to change the name since it's a new collection
         collectionToEdit = collection
     }
+
+    #if !os(macOS)
+    @ToolbarContentBuilder
+    private var connectionToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            if let onSwitchConnection {
+                Button {
+                    onSwitchConnection()
+                } label: {
+                    Label(connectionName ?? "Connection", systemImage: "externaldrive")
+                }
+            }
+        }
+    }
+    #endif
 }
 
 #Preview {

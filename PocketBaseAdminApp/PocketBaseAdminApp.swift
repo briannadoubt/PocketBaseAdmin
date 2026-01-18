@@ -16,21 +16,11 @@ import PocketBaseIntents
 @main
 struct PocketBaseAdminApp: App {
     #if os(macOS)
-    @State private var serverManager: AnyObject? = {
-        if #available(macOS 15.0, *) {
-            return PocketBaseServerManager()
-        }
-        return nil
-    }()
+    @State private var serverManager = PocketBaseServerManager()
     #endif
 
     /// Central connection hub for managing multiple PocketBase connections
-    @State private var connectionHub: AnyObject? = {
-        if #available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *) {
-            return ConnectionHub()
-        }
-        return nil
-    }()
+    @State private var connectionHub = ConnectionHub()
 
     init() {
         // Register background tasks for health checks and notifications
@@ -49,7 +39,11 @@ struct PocketBaseAdminApp: App {
     @SceneBuilder
     private var mainWindowScene: some Scene {
         WindowGroup("PocketBase Admin", id: "main") {
+            #if os(macOS)
             MainWindowContent(connectionHub: connectionHub, serverManager: serverManager)
+            #else
+            MainWindowContent(connectionHub: connectionHub)
+            #endif
         }
         #if os(macOS)
         .defaultSize(width: 1200, height: 800)
@@ -60,14 +54,11 @@ struct PocketBaseAdminApp: App {
     }
 
     #if os(macOS)
-    @available(macOS 15.0, *)
     @SceneBuilder
     private var connectionsWindowScene: some Scene {
         Window("Connections", id: "connections") {
-            if let hub = connectionHub as? ConnectionHub {
-                ConnectionPickerView()
-                    .environment(hub)
-            }
+            ConnectionPickerView()
+                .environment(connectionHub)
         }
         .keyboardShortcut("1", modifiers: [.command, .shift])
         .defaultSize(width: 400, height: 500)
@@ -78,10 +69,8 @@ struct PocketBaseAdminApp: App {
     private var appCommands: some Commands {
         AppCommands()
         #if os(macOS)
-        if #available(macOS 15.0, *) {
-            ServerCommands()
-            ConnectionCommands()
-        }
+        ServerCommands()
+        ConnectionCommands()
         #endif
         InspectorCommands()
         SidebarCommands()
@@ -91,58 +80,9 @@ struct PocketBaseAdminApp: App {
     }
 }
 
-// MARK: - Connection Hub Modifier
-
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
-struct ConnectionHubModifier: ViewModifier {
-    let connectionHub: AnyObject?
-
-    func body(content: Content) -> some View {
-        if let hub = connectionHub as? ConnectionHub {
-            content.environment(hub)
-        } else {
-            content
-        }
-    }
-}
-
-#if os(macOS)
-/// View modifier to inject server manager into environment
-/// Uses a wrapper view to ensure @Observable tracking works correctly
-struct ServerManagerModifier: ViewModifier {
-    let serverManager: AnyObject?
-
-    func body(content: Content) -> some View {
-        if #available(macOS 15.0, *), let manager = serverManager as? PocketBaseServerManager {
-            ServerManagerObservingView(manager: manager) {
-                content
-            }
-        } else {
-            content
-        }
-    }
-}
-
-/// Wrapper view that properly observes the server manager
-/// This is needed because storing @Observable objects as AnyObject breaks observation
-@available(macOS 15.0, *)
-struct ServerManagerObservingView<Content: View>: View {
-    @Bindable var manager: PocketBaseServerManager
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        // Access state to establish observation, then pass manager through environment
-        let _ = manager.state
-        content()
-            .environment(\.serverManager, manager)
-    }
-}
-#endif
-
 // MARK: - Connection Commands (macOS)
 
 #if os(macOS)
-@available(macOS 15.0, *)
 struct ConnectionCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
@@ -166,286 +106,310 @@ struct ConnectionCommands: Commands {
 
 // MARK: - Main Window Content
 
-/// Main window content that handles availability checks and routing
+/// Main window content
 struct MainWindowContent: View {
-    let connectionHub: AnyObject?
-    let serverManager: AnyObject?
+    let connectionHub: ConnectionHub
+    #if os(macOS)
+    let serverManager: PocketBaseServerManager
+    #endif
 
     var body: some View {
-        if #available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *),
-           let hub = connectionHub as? ConnectionHub {
-            // New multi-connection architecture
-            NewArchitectureRootView(hub: hub, serverManager: serverManager)
-        } else {
-            // Legacy single-connection mode
-            LegacyRootView(serverManager: serverManager)
-        }
+        #if os(macOS)
+        NewArchitectureRootView(hub: connectionHub, serverManager: serverManager)
+        #else
+        NewArchitectureRootView(hub: connectionHub)
+        #endif
     }
 }
 
 /// Root view for the new multi-connection architecture
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
+/// Uses ConnectionWindow directly without NavigationSplitView wrapper to avoid double sidebars
 struct NewArchitectureRootView: View {
     let hub: ConnectionHub
-    let serverManager: AnyObject?
+    #if os(macOS)
+    let serverManager: PocketBaseServerManager
+    #endif
 
     @State private var selectedConnectionID: UUID?
-    @State private var showingConnectionPicker = true
+    @State private var showingConnectionPicker = false
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     var body: some View {
-        NavigationSplitView {
-            // Sidebar with connections list
-            ConnectionSidebar(selectedConnectionID: $selectedConnectionID)
-        } detail: {
-            // Main content area
+        mainContent
+        #if os(macOS)
+            .environment(\.serverManager, serverManager)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ConnectionPicker(hub: hub, selectedConnectionID: $selectedConnectionID)
+                }
+            }
+        #else
+            .sheet(isPresented: $showingConnectionPicker) {
+                ConnectionPickerSheet(hub: hub, selectedConnectionID: $selectedConnectionID)
+            }
+        #endif
+    }
+
+    private var mainContent: some View {
+        Group {
             if let connectionID = selectedConnectionID {
-                ConnectionWindow(connectionID: connectionID)
+                ConnectionWindow(connectionID: connectionID, onSwitchConnection: switchConnectionAction)
+            } else if let firstConnection = hub.connections.first {
+                ConnectionWindow(connectionID: firstConnection.id, onSwitchConnection: switchConnectionAction)
+                    .onAppear {
+                        selectedConnectionID = firstConnection.id
+                    }
             } else {
-                selectConnectionView
+                noConnectionsView
             }
         }
         .environment(hub)
+        .task {
+            // Start Bonjour discovery
+            hub.startBonjourBrowsing()
+
+            if selectedConnectionID == nil {
+                if let first = hub.connections.first {
+                    selectedConnectionID = first.id
+                }
+                // Don't auto-create localhost on iOS - wait for discovery or manual add
+            }
+        }
+    }
+
+    private var selectedConnection: Connection? {
+        hub.connections.first { $0.id == selectedConnectionID }
+    }
+
+    private var switchConnectionAction: (() -> Void) {
         #if os(macOS)
-        .modifier(ServerManagerModifier(serverManager: serverManager))
+        return {
+            openWindow(id: "connections")
+        }
+        #else
+        return { [self] in
+            showingConnectionPicker = true
+        }
         #endif
     }
 
-    private var selectConnectionView: some View {
+    private var noConnectionsView: some View {
         ContentUnavailableView {
-            Label("Select a Connection", systemImage: "externaldrive.connected.to.line.below")
+            Label("No Connections", systemImage: "externaldrive.badge.plus")
         } description: {
-            Text("Choose a PocketBase instance from the sidebar, or add a new one.")
+            Text("Searching for PocketBase instances on your network...")
+        } actions: {
+            if !hub.discoveredInstances.isEmpty {
+                ForEach(hub.discoveredInstances) { instance in
+                    Button(instance.name) {
+                        Task {
+                            try? await hub.addDiscoveredInstance(instance)
+                            if let added = hub.connections.last {
+                                selectedConnectionID = added.id
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else {
+                ProgressView()
+                    .padding(.bottom, 8)
+            }
+
+            Button("Add Manually") {
+                showingConnectionPicker = true
+            }
+
+            #if os(macOS)
+            Button("Add Local Server") {
+                Task {
+                    let localhost = Connection.localhost()
+                    try? await hub.add(localhost)
+                    selectedConnectionID = localhost.id
+                }
+            }
+            #endif
         }
     }
 }
 
-/// Sidebar view showing all connections
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
-struct ConnectionSidebar: View {
+/// Connection picker sheet for iOS
+#if !os(macOS)
+struct ConnectionPickerSheet: View {
+    let hub: ConnectionHub
     @Binding var selectedConnectionID: UUID?
-    @Environment(ConnectionHub.self) private var hub
-    #if os(macOS)
-    @Environment(\.serverManager) private var serverManager
-    #endif
+    @Environment(\.dismiss) private var dismiss
 
-    @State private var isAddingConnection = false
+    @State private var isAddingManually = false
+    @State private var manualHost = ""
+    @State private var manualPort = "8090"
+    @State private var manualName = ""
+    @State private var useTLS = false
 
     var body: some View {
-        List(selection: $selectedConnectionID) {
-            // Local server section
-            Section("Local Server") {
-                ForEach(hub.connections.filter { $0.isLocal }) { connection in
-                    ConnectionSidebarRow(connection: connection)
-                        .tag(connection.id)
-                }
+        NavigationStack {
+            List {
+                // Saved connections
+                if !hub.connections.isEmpty {
+                    Section("Saved") {
+                        ForEach(hub.connections) { connection in
+                            Button {
+                                selectedConnectionID = connection.id
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Image(systemName: connection.statusIcon)
+                                        .foregroundStyle(connection.id == selectedConnectionID ? .green : .secondary)
 
-                if hub.connections.filter({ $0.isLocal }).isEmpty {
-                    Button {
-                        addLocalConnection()
-                    } label: {
-                        Label("Add Local Server", systemImage: "plus")
-                    }
-                }
-            }
+                                    VStack(alignment: .leading) {
+                                        Text(connection.name)
+                                            .foregroundStyle(.primary)
+                                        Text(connection.displayURL)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
 
-            // Remote connections section
-            Section("Remote Servers") {
-                ForEach(hub.connections.filter { !$0.isLocal }) { connection in
-                    ConnectionSidebarRow(connection: connection)
-                        .tag(connection.id)
-                }
-            }
+                                    Spacer()
 
-            // Discovered on network
-            if !hub.discoveredInstances.isEmpty {
-                Section("Discovered") {
-                    ForEach(hub.discoveredInstances) { instance in
-                        Button {
-                            addDiscoveredInstance(instance)
-                        } label: {
-                            Label(instance.name, systemImage: "bonjour")
+                                    if connection.id == selectedConnectionID {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                        }
+                        .onDelete { indexSet in
+                            Task {
+                                for index in indexSet {
+                                    try? await hub.remove(hub.connections[index])
+                                }
+                            }
                         }
                     }
                 }
+
+                // Discovered instances
+                if !hub.discoveredInstances.isEmpty {
+                    Section("Discovered on Network") {
+                        ForEach(hub.discoveredInstances) { instance in
+                            Button {
+                                Task {
+                                    try? await hub.addDiscoveredInstance(instance)
+                                    if let added = hub.connections.last {
+                                        selectedConnectionID = added.id
+                                    }
+                                    dismiss()
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "bonjour")
+                                        .foregroundStyle(.orange)
+
+                                    VStack(alignment: .leading) {
+                                        Text(instance.name)
+                                            .foregroundStyle(.primary)
+                                        Text("\(instance.host):\(instance.port)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Add manually
+                Section("Add Connection") {
+                    TextField("Name", text: $manualName)
+                    TextField("Host (e.g. 192.168.1.100)", text: $manualHost)
+                        .textContentType(.URL)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                    TextField("Port", text: $manualPort)
+                        .keyboardType(.numberPad)
+                    Toggle("Use HTTPS", isOn: $useTLS)
+
+                    Button("Add") {
+                        addManualConnection()
+                    }
+                    .disabled(manualHost.isEmpty)
+                }
             }
-        }
-        .navigationTitle("Connections")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isAddingConnection = true
-                } label: {
-                    Label("Add Connection", systemImage: "plus")
+            .navigationTitle("Connections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
                 }
             }
         }
-        .sheet(isPresented: $isAddingConnection) {
-            AddConnectionView()
-        }
-        .onAppear {
-            hub.startBonjourBrowsing()
-        }
     }
 
-    private func addLocalConnection() {
+    private func addManualConnection() {
+        let port = Int(manualPort) ?? 8090
+        let name = manualName.isEmpty ? manualHost : manualName
+        let connection = Connection(
+            id: UUID(),
+            name: name,
+            host: manualHost,
+            port: port,
+            useTLS: useTLS,
+            isLocal: false,
+            discoveredViaBonjour: false
+        )
         Task {
-            let connection = Connection.localhost()
             try? await hub.add(connection)
             selectedConnectionID = connection.id
-        }
-    }
-
-    private func addDiscoveredInstance(_ instance: BonjourBrowser.DiscoveredInstance) {
-        Task {
-            try? await hub.addDiscoveredInstance(instance)
+            dismiss()
         }
     }
 }
+#endif
 
-/// Row in the connection sidebar
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
-struct ConnectionSidebarRow: View {
-    let connection: Connection
-    @Environment(ConnectionHub.self) private var hub
-    #if os(macOS)
-    @Environment(\.serverManager) private var serverManager
-    #endif
+#if os(macOS)
+/// Toolbar picker for switching between connections
+struct ConnectionPicker: View {
+    let hub: ConnectionHub
+    @Binding var selectedConnectionID: UUID?
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        HStack {
-            Image(systemName: connection.statusIcon)
-                .foregroundStyle(statusColor)
-
-            VStack(alignment: .leading) {
-                Text(connection.name)
-                    .fontWeight(.medium)
-
-                #if os(macOS)
-                if connection.isLocal, let serverManager {
-                    Text(serverManager.state.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(connection.displayURL)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        Menu {
+            ForEach(hub.connections) { connection in
+                Button {
+                    selectedConnectionID = connection.id
+                } label: {
+                    HStack {
+                        if connection.id == selectedConnectionID {
+                            Image(systemName: "checkmark")
+                        }
+                        Label(connection.name, systemImage: connection.statusIcon)
+                    }
                 }
-                #else
-                Text(connection.displayURL)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                #endif
             }
 
-            Spacer()
+            Divider()
 
-            if hub.isAuthenticated(for: connection) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.caption)
-            }
-        }
-        .contextMenu {
-            Button(role: .destructive) {
-                Task {
-                    try? await hub.remove(connection)
-                }
+            Button {
+                openWindow(id: "connections")
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Manage Connections...", systemImage: "slider.horizontal.3")
             }
+        } label: {
+            Label(
+                selectedConnection?.name ?? "Select Connection",
+                systemImage: selectedConnection?.statusIcon ?? "externaldrive"
+            )
         }
     }
 
-    private var statusColor: Color {
-        #if os(macOS)
-        if connection.isLocal, let serverManager {
-            return serverManager.state.isRunning ? .green : .secondary
-        }
-        #endif
-        if connection.isLocal {
-            return .blue
-        } else if connection.discoveredViaBonjour {
-            return .orange
-        }
-        return .secondary
+    private var selectedConnection: Connection? {
+        hub.connections.first { $0.id == selectedConnectionID }
     }
 }
+#endif
 
-/// Legacy root view for older OS versions
-struct LegacyRootView: View {
-    let serverManager: AnyObject?
-
-    var body: some View {
-        AdminRootView()
-            #if targetEnvironment(simulator) || os(macOS)
-            .pocketbase(.localhost)
-            #elseif DEBUG
-            .pocketbase(.localNetwork(ip: "10.0.0.185"))
-            #else
-            .pocketbase(url: URL(string: "https://api.pocketbase.app")!)
-            #endif
-            #if os(macOS)
-            .modifier(ServerManagerModifier(serverManager: serverManager))
-            #endif
-    }
-}
-
-// MARK: - Legacy Root View
-
-/// Root view that handles admin authentication state (for older OS versions)
-struct AdminRootView: View {
-    @Environment(\.pocketbase) private var pocketbase
-    @State private var isAuthenticated = false
-    @State private var isCheckingAuth = true
-
-    var body: some View {
-        Group {
-            if isCheckingAuth {
-                ProgressView("Checking authentication...")
-            } else if isAuthenticated {
-                #if os(macOS)
-                if #available(macOS 15.0, *) {
-                    ConsoleContainerView(onLogout: logout)
-                } else {
-                    ContentView(onLogout: logout)
-                }
-                #else
-                ContentView(onLogout: logout)
-                #endif
-            } else {
-                AdminLoginView {
-                    isAuthenticated = true
-                }
-            }
-        }
-        .task {
-            await checkAuthentication()
-        }
-    }
-
-    private func checkAuthentication() async {
-        // Small delay to let authStore initialize
-        try? await Task.sleep(for: .milliseconds(100))
-        isAuthenticated = pocketbase.authStore.isValid
-        isCheckingAuth = false
-
-        // Sync configuration for App Intents (Siri, Shortcuts, Widgets)
-        await syncIntentConfiguration()
-
-        // Request notification permissions when authenticated
-        if isAuthenticated {
-            await BackgroundTaskManager.shared.requestNotificationPermissions()
-        }
-    }
-
-    private func logout() {
-        pocketbase.authStore.clear()
-        isAuthenticated = false
-    }
-
-    private func syncIntentConfiguration() async {
-        #if canImport(PocketBaseIntents)
-        await ServerConfiguration.shared.syncFromPocketBase(pocketbase)
-        #endif
-    }
-}

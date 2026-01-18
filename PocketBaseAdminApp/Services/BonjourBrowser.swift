@@ -9,7 +9,6 @@ import Foundation
 import Network
 
 /// Browses for PocketBase instances on the local network using Bonjour/mDNS
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 @Observable @MainActor
 final class BonjourBrowser {
     /// Service type for PocketBase instances
@@ -151,7 +150,13 @@ final class BonjourBrowser {
                     case .ipv4(let addr):
                         hostString = "\(addr)"
                     case .ipv6(let addr):
-                        hostString = "\(addr)"
+                        // Get the string representation and strip scope ID (e.g., %en0)
+                        // Scope IDs are local and not valid in URLs
+                        var ipv6String = "\(addr)"
+                        if let scopeIndex = ipv6String.firstIndex(of: "%") {
+                            ipv6String = String(ipv6String[..<scopeIndex])
+                        }
+                        hostString = ipv6String
                     case .name(let hostname, _):
                         hostString = hostname
                     @unknown default:

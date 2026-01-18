@@ -21,7 +21,7 @@
 		035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2182EEF6326003225F0 /* PocketBaseIntents */; };
 		037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 037F11EE2D90A587009717C8 /* PocketBaseAdmin */; };
 		0386276C2E10C58900E37D56 /* BetterTable in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 0386276B2E10C58900E37D56 /* BetterTable */; };
-		03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */ = {isa = PBXBuildFile; productRef = 03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */; };
+		03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */; };
 		03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */ = {isa = PBXBuildFile; productRef = 03EAC97C2D92746200E85F29 /* PocketBaseUI */; };
 /* End PBXBuildFile section */
 
@@ -824,6 +824,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PocketBaseAdminApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Admin;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -875,6 +876,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PocketBaseAdminApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Admin;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

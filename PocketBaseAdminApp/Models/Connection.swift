@@ -39,7 +39,26 @@ struct Connection: Identifiable, Codable, Hashable, Sendable {
     /// Computed URL for this connection
     var url: URL {
         let scheme = useTLS ? "https" : "http"
-        return URL(string: "\(scheme)://\(host):\(port)")!
+
+        // Handle IPv6 addresses - they need to be wrapped in brackets
+        // Also strip scope ID (e.g., %en0) as it's not valid in URLs
+        var formattedHost = host
+
+        // Check if this looks like an IPv6 address (contains colons but isn't already bracketed)
+        if host.contains(":") && !host.hasPrefix("[") {
+            // Strip scope ID if present (e.g., fe80::1%en0 -> fe80::1)
+            if let scopeIndex = host.firstIndex(of: "%") {
+                formattedHost = String(host[..<scopeIndex])
+            }
+            // Wrap in brackets for URL
+            formattedHost = "[\(formattedHost)]"
+        }
+
+        guard let url = URL(string: "\(scheme)://\(formattedHost):\(port)") else {
+            // Fallback to localhost if URL is somehow still invalid
+            return URL(string: "\(scheme)://127.0.0.1:\(port)")!
+        }
+        return url
     }
 
     /// Admin dashboard URL
@@ -107,10 +126,21 @@ extension Connection {
     var displayURL: String {
         let scheme = useTLS ? "https" : "http"
         let defaultPort = useTLS ? 443 : 80
-        if port == defaultPort {
-            return "\(scheme)://\(host)"
+
+        // Format host for display (handle IPv6)
+        var formattedHost = host
+        if host.contains(":") && !host.hasPrefix("[") {
+            // Strip scope ID if present
+            if let scopeIndex = host.firstIndex(of: "%") {
+                formattedHost = String(host[..<scopeIndex])
+            }
+            formattedHost = "[\(formattedHost)]"
         }
-        return "\(scheme)://\(host):\(port)"
+
+        if port == defaultPort {
+            return "\(scheme)://\(formattedHost)"
+        }
+        return "\(scheme)://\(formattedHost):\(port)"
     }
 
     /// Status icon based on connection type

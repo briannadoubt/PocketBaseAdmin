@@ -8,11 +8,12 @@
 import SwiftUI
 import PocketBase
 import PocketBaseUI
+import PocketBaseAdmin
 
 /// Window content for a specific PocketBase connection
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 struct ConnectionWindow: View {
     let connectionID: UUID?
+    var onSwitchConnection: (() -> Void)?
 
     @Environment(ConnectionHub.self) private var hub
     #if os(macOS)
@@ -28,11 +29,6 @@ struct ConnectionWindow: View {
     @State private var hasAttemptedAutoStart = false
 
     var body: some View {
-        // Access server manager state at top level to establish observation
-        #if os(macOS)
-        let _ = serverManager?.state
-        #endif
-
         Group {
             if let connectionID, let connection = hub.connections.first(where: { $0.id == connectionID }) {
                 connectionContent(for: connection)
@@ -61,11 +57,11 @@ struct ConnectionWindow: View {
     @ViewBuilder
     private func localConnectionContent(for connection: Connection) -> some View {
         if let serverManager {
-            let currentState = serverManager.state
-            let _ = print("[ConnectionWindow] Rendering for state: \(currentState.displayName)")
-            switch currentState {
+            switch serverManager.state {
             case .stopped:
                 serverStoppedView(connection: connection)
+            case .needsSetup:
+                localSetupView(connection: connection)
             case .downloading:
                 downloadingView()
             case .starting:
@@ -90,6 +86,16 @@ struct ConnectionWindow: View {
         } else {
             // No server manager, treat as remote
             remoteConnectionContent(for: connection)
+        }
+    }
+
+    @ViewBuilder
+    private func localSetupView(connection: Connection) -> some View {
+        LocalSuperuserSetupView(serverManager: serverManager!) {
+            // After setup completes, start the server
+            Task {
+                await serverManager?.startAfterSetup()
+            }
         }
     }
 
@@ -179,13 +185,12 @@ struct ConnectionWindow: View {
         if isCheckingAuth {
             ProgressView("Checking authentication...")
         } else if isAuthenticated {
-            #if os(macOS)
-            ConsoleContainerView(onLogout: logout)
-                .pocketbase(pocketbase)
-            #else
-            ContentView(onLogout: logout)
-                .pocketbase(pocketbase)
-            #endif
+            ContentView(
+                onLogout: logout,
+                onSwitchConnection: onSwitchConnection,
+                connectionName: connection.name
+            )
+            .pocketbase(pocketbase)
         } else {
             AdminLoginView {
                 isAuthenticated = true
@@ -265,10 +270,33 @@ struct ConnectionWindow: View {
     }
 
     private func checkNeedsSetup(_ pocketbase: PocketBase) async -> Bool {
-        // For now, we determine if setup is needed by checking if auth fails
-        // A fresh PocketBase instance will return a specific error when no admin exists
-        // In the future, this could be enhanced to check a specific endpoint
-        return false
+        // Check if there are any superusers by trying to get auth methods
+        // If the instance has no admins, we need to create one
+        do {
+            // Try to list superusers - this will fail if none exist or if we're not authenticated
+            // But we can check the health endpoint or try a specific check
+            let collection = pocketbase.collection(Superuser.self)
+
+            // Try to get auth methods - if this returns and has password enabled,
+            // but we can't authenticate, we need to check if any admins exist
+            _ = try await collection.listAuthMethods()
+
+            // If we got here, the collection exists and is accessible
+            // Now check if there are any records
+            let result = try await collection.list(page: 1, perPage: 1)
+            return result.totalItems == 0
+        } catch {
+            // If we get a specific error indicating no admins, return true
+            let errorString = error.localizedDescription.lowercased()
+            if errorString.contains("no superuser") ||
+               errorString.contains("empty auth collection") ||
+               errorString.contains("missing collection") {
+                return true
+            }
+            // For other errors (like 401 unauthorized), assume setup is not needed
+            // The user will just need to log in
+            return false
+        }
     }
 
     private func checkAuthentication() async {
@@ -287,12 +315,133 @@ struct ConnectionWindow: View {
     }
 }
 
+// MARK: - Local Superuser Setup View
+
+#if os(macOS)
+/// Setup view for creating the initial superuser on a local PocketBase instance
+/// Uses the CLI to create the superuser before the server starts
+struct LocalSuperuserSetupView: View {
+    let serverManager: PocketBaseServerManager
+    let onComplete: () -> Void
+
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    @State private var isCreating = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 32) {
+            // Header
+            VStack(spacing: 16) {
+                Image(systemName: "person.badge.key.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(.tint)
+
+                Text("Create Admin Account")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                Text("Set up your PocketBase superuser account to get started.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Form
+            VStack(spacing: 16) {
+                TextField("Email", text: $email)
+                    .textContentType(.emailAddress)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+
+                SecureField("Password (min 10 characters)", text: $password)
+                    .textContentType(.newPassword)
+                    .textFieldStyle(.roundedBorder)
+
+                SecureField("Confirm Password", text: $confirmPassword)
+                    .textContentType(.newPassword)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .frame(maxWidth: 350)
+
+            // Validation messages
+            VStack(spacing: 8) {
+                if !email.isEmpty && !isValidEmail(email) {
+                    Label("Please enter a valid email address", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if !password.isEmpty && password.count < 10 {
+                    Label("Password must be at least 10 characters", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if !confirmPassword.isEmpty && password != confirmPassword {
+                    Label("Passwords do not match", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                if let error {
+                    Label(error, systemImage: "xmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            // Create button
+            Button {
+                createAccount()
+            } label: {
+                if isCreating {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text("Create Account & Start Server")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!isFormValid || isCreating)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var isFormValid: Bool {
+        isValidEmail(email) &&
+        password.count >= 10 &&
+        password == confirmPassword
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = #"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"#
+        return email.range(of: emailRegex, options: .regularExpression) != nil
+    }
+
+    private func createAccount() {
+        isCreating = true
+        error = nil
+
+        Task {
+            do {
+                try await serverManager.createSuperuser(email: email, password: password)
+                onComplete()
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isCreating = false
+        }
+    }
+}
+#endif
+
 // MARK: - Previews
 
-#if DEBUG
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 #Preview {
     ConnectionWindow(connectionID: nil)
         .environment(ConnectionHub())
 }
-#endif

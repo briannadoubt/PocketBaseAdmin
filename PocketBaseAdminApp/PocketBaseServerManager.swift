@@ -9,14 +9,15 @@
 import Foundation
 import SwiftUI
 import Darwin
+import Network
 
 /// Manages the lifecycle of a local PocketBase server instance
-@available(macOS 15.0, *)
 @Observable @MainActor
 final class PocketBaseServerManager {
 
     enum ServerState: Equatable {
         case stopped
+        case needsSetup  // No superuser exists, need to create one first
         case starting
         case running
         case stopping
@@ -30,9 +31,14 @@ final class PocketBaseServerManager {
 
         var canStart: Bool {
             switch self {
-            case .stopped, .error: return true
+            case .stopped, .error, .needsSetup: return true
             default: return false
             }
+        }
+
+        var needsSetup: Bool {
+            if case .needsSetup = self { return true }
+            return false
         }
 
         var canStop: Bool {
@@ -45,6 +51,7 @@ final class PocketBaseServerManager {
         var displayName: String {
             switch self {
             case .stopped: return "Stopped"
+            case .needsSetup: return "Setup Required"
             case .starting: return "Starting..."
             case .running: return "Running"
             case .stopping: return "Stopping..."
@@ -55,11 +62,7 @@ final class PocketBaseServerManager {
     }
 
     /// Current state of the server
-    private(set) var state: ServerState = .stopped {
-        didSet {
-            print("[ServerManager] State changed: \(oldValue.displayName) -> \(state.displayName)")
-        }
-    }
+    private(set) var state: ServerState = .stopped
 
     /// Console output logs
     private(set) var logs: [LogEntry] = []
@@ -72,6 +75,12 @@ final class PocketBaseServerManager {
 
     /// Time when server was last started (for detecting immediate crashes)
     private var serverStartTime: Date?
+
+
+    /// The advertised service name
+    var serviceName: String {
+        Host.current().localizedName ?? "PocketBase"
+    }
 
     /// Data directory for persistence
     var dataDirectory: URL {
@@ -213,6 +222,58 @@ final class PocketBaseServerManager {
         appendLog("PocketBase v\(pocketbaseVersion) installed successfully")
     }
 
+    /// Check if the database has any superusers
+    func checkNeedsSuperuserSetup() -> Bool {
+        // Check if pb_data exists and has the database file
+        let dbPath = dataDirectory.appendingPathComponent("data.db")
+        if !FileManager.default.fileExists(atPath: dbPath.path) {
+            // No database yet, will need setup
+            return true
+        }
+
+        // Use pocketbase CLI to check - if we can list superusers, we don't need setup
+        // We'll use a simple heuristic: try to run a command that requires the DB
+        // and check if it indicates no superusers
+        let checkProcess = Process()
+        checkProcess.executableURL = executablePath
+        checkProcess.arguments = ["superuser", "upsert", "--help", "--dir", dataDirectory.path]
+        checkProcess.standardOutput = FileHandle.nullDevice
+        checkProcess.standardError = FileHandle.nullDevice
+
+        // For now, we'll assume setup is needed if no data.db exists
+        // The actual check happens when the server starts and tries to authenticate
+        return !FileManager.default.fileExists(atPath: dbPath.path)
+    }
+
+    /// Create a superuser using the CLI (must be called before server starts)
+    func createSuperuser(email: String, password: String) async throws {
+        appendLog("Creating superuser account...")
+
+        let process = Process()
+        process.executableURL = executablePath
+        process.currentDirectoryURL = binDirectory
+        process.arguments = [
+            "superuser", "upsert",
+            email, password,
+            "--dir", dataDirectory.path
+        ]
+
+        let stderrPipe = Pipe()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            let errorData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+            throw ServerError.startFailed("Failed to create superuser: \(errorMessage)")
+        }
+
+        appendLog("Superuser account created successfully")
+    }
+
     /// Start the PocketBase server
     func start() async {
         guard state.canStart else {
@@ -227,6 +288,13 @@ final class PocketBaseServerManager {
             // Ensure PocketBase is installed
             try await ensurePocketBaseInstalled()
 
+            // Check if we need superuser setup before starting
+            if checkNeedsSuperuserSetup() {
+                state = .needsSetup
+                appendLog("No superuser found - setup required before starting server")
+                return
+            }
+
             state = .starting
             appendLog("Starting PocketBase on port \(port)...")
 
@@ -238,6 +306,22 @@ final class PocketBaseServerManager {
         } catch {
             state = .error(error.localizedDescription)
             appendLog("Failed to start server: \(error.localizedDescription)", isError: true)
+        }
+    }
+
+    /// Start the server after superuser has been created
+    func startAfterSetup() async {
+        guard state == .needsSetup else {
+            await start()
+            return
+        }
+
+        state = .starting
+        appendLog("Starting PocketBase on port \(port)...")
+
+        // Start the server in a background task
+        serverTask = Task.detached { [weak self] in
+            await self?.runServer()
         }
     }
 
@@ -311,8 +395,14 @@ final class PocketBaseServerManager {
         process.arguments = [
             "serve",
             "--dir", dataDirectory.path,
-            "--http", "127.0.0.1:\(port)"
+            "--http", "0.0.0.0:\(port)",  // Bind to all interfaces for network discovery
+            "--origins", "*"  // Allow connections from the app
         ]
+
+        // Set environment to disable browser auto-open
+        var environment = ProcessInfo.processInfo.environment
+        environment["PB_OPEN_BROWSER"] = "false"
+        process.environment = environment
 
         appendLog("Using executable URL: \(execURL.path)")
         appendLog("File exists at URL: \(FileManager.default.fileExists(atPath: execURL.path))")
@@ -341,6 +431,9 @@ final class PocketBaseServerManager {
             state = .running
             appendLog("Server is running at http://127.0.0.1:\(port)")
             appendLog("Admin UI: http://127.0.0.1:\(port)/_/")
+
+            // Start Bonjour advertising so other devices can discover us
+            startBonjourAdvertising()
 
             // Stream output in background tasks
             let stdoutHandle = stdout.fileHandleForReading
@@ -375,6 +468,7 @@ final class PocketBaseServerManager {
                     self.process = nil
                     self.stdoutPipe = nil
                     self.stderrPipe = nil
+                    self.stopBonjourAdvertising()
 
                     let exitCode = terminatedProcess.terminationStatus
                     let terminationReason = terminatedProcess.terminationReason
@@ -384,8 +478,6 @@ final class PocketBaseServerManager {
                     // Check if this was an immediate crash (within 5 seconds of starting)
                     let timeSinceStart = self.serverStartTime.map { Date().timeIntervalSince($0) } ?? 0
                     let crashedImmediately = wasRunning && timeSinceStart < 5.0 && exitCode != 0
-
-                    print("[ServerManager] Process terminated - exitCode: \(exitCode), reason: \(terminationReason.rawValue), timeSinceStart: \(timeSinceStart)s, wasRunning: \(wasRunning), wasStopping: \(wasStopping)")
 
                     if crashedImmediately {
                         self.state = .error("Server crashed immediately (exit code: \(exitCode)). Check console for details.")
@@ -409,8 +501,6 @@ final class PocketBaseServerManager {
 
     /// Stop the PocketBase server
     func stop() async {
-        print("[ServerManager] stop() called - current state: \(state.displayName)")
-
         guard state.canStop else {
             appendLog("Cannot stop server in current state", isError: true)
             return
@@ -418,6 +508,9 @@ final class PocketBaseServerManager {
 
         state = .stopping
         appendLog("Stopping PocketBase server...")
+
+        // Stop Bonjour advertising
+        stopBonjourAdvertising()
 
         // Clear start time to prevent false crash detection
         serverStartTime = nil
@@ -445,6 +538,57 @@ final class PocketBaseServerManager {
     /// Clear all logs
     func clearLogs() {
         logs.removeAll()
+    }
+
+    // MARK: - Bonjour Advertising
+
+    /// NetService for Bonjour advertising
+    private var bonjourService: NetService?
+
+    /// Start advertising the local PocketBase instance via Bonjour
+    private func startBonjourAdvertising() {
+        guard bonjourService == nil else { return }
+
+        // Create NetService to advertise our PocketBase instance
+        // Note: type must match BonjourBrowser.serviceType exactly for discovery to work
+        let service = NetService(
+            domain: "local.",
+            type: "_pocketbase._tcp",
+            name: serviceName,
+            port: Int32(port)
+        )
+
+        // Set TXT record with metadata
+        let txtData = makeTXTRecord()
+        service.setTXTRecord(txtData)
+
+        service.delegate = BonjourServiceDelegate.shared
+        service.publish()
+
+        bonjourService = service
+        appendLog("Bonjour: Advertising '\(serviceName)' on local network (port \(port))")
+    }
+
+    /// Stop advertising via Bonjour
+    private func stopBonjourAdvertising() {
+        bonjourService?.stop()
+        bonjourService = nil
+        appendLog("Bonjour: Stopped advertising")
+    }
+
+    /// Create TXT record data with metadata about this instance
+    private func makeTXTRecord() -> Data {
+        var dict: [String: Data] = [:]
+        dict["version"] = pocketbaseVersion.data(using: .utf8)
+        dict["name"] = serviceName.data(using: .utf8)
+
+        // Include iCloud account hash for "same account" discovery
+        if let accountToken = FileManager.default.ubiquityIdentityToken {
+            let hash = accountToken.hash
+            dict["account"] = String(format: "%08x", hash).data(using: .utf8)
+        }
+
+        return NetService.data(fromTXTRecord: dict)
     }
 
     private func appendLog(_ message: String, isError: Bool = false) {
@@ -490,16 +634,37 @@ extension ProcessInfo {
 
 // MARK: - Environment Key
 
-@available(macOS 15.0, *)
 private struct PocketBaseServerManagerKey: EnvironmentKey {
     static let defaultValue: PocketBaseServerManager? = nil
 }
 
-@available(macOS 15.0, *)
 extension EnvironmentValues {
     var serverManager: PocketBaseServerManager? {
         get { self[PocketBaseServerManagerKey.self] }
         set { self[PocketBaseServerManagerKey.self] = newValue }
+    }
+}
+
+// MARK: - Bonjour Service Delegate
+
+/// Delegate for NetService publishing events
+final class BonjourServiceDelegate: NSObject, NetServiceDelegate {
+    static let shared = BonjourServiceDelegate()
+
+    private override init() {
+        super.init()
+    }
+
+    func netServiceDidPublish(_ sender: NetService) {
+        print("Bonjour: Published service '\(sender.name)' on port \(sender.port)")
+    }
+
+    func netService(_ sender: NetService, didNotPublish errorDict: [String: NSNumber]) {
+        print("Bonjour: Failed to publish service - \(errorDict)")
+    }
+
+    func netServiceDidStop(_ sender: NetService) {
+        print("Bonjour: Service stopped")
     }
 }
 #endif

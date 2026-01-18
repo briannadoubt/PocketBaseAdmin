@@ -141,6 +141,7 @@ struct ServerStatusIndicator: View {
     private var statusColor: Color {
         switch state {
         case .stopped: .secondary
+        case .needsSetup: .blue
         case .starting, .stopping, .downloading: .orange
         case .running: .green
         case .error: .red
@@ -150,6 +151,7 @@ struct ServerStatusIndicator: View {
     private var statusText: String {
         switch state {
         case .stopped: "Stopped"
+        case .needsSetup: "Setup Required"
         case .starting: "Starting..."
         case .downloading: "Downloading..."
         case .running: "Running"

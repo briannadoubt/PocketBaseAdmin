@@ -19,7 +19,6 @@ enum SyncStatus: Equatable, Sendable {
 }
 
 /// Central hub for managing PocketBase connections
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 @Observable @MainActor
 final class ConnectionHub {
     // MARK: - Published State
@@ -256,9 +255,14 @@ final class ConnectionHub {
 
     private func loadConnections() {
         guard FileManager.default.fileExists(atPath: storageURL.path) else {
-            // Add default localhost connection on first launch
+            #if os(macOS)
+            // Add default localhost connection on first launch (macOS only)
             connections = [.localhost()]
             saveConnections()
+            #else
+            // On iOS/visionOS, start with empty list and rely on Bonjour discovery
+            connections = []
+            #endif
             return
         }
 
@@ -267,7 +271,11 @@ final class ConnectionHub {
             connections = try JSONDecoder().decode([Connection].self, from: data)
         } catch {
             print("Failed to load connections: \(error)")
+            #if os(macOS)
             connections = [.localhost()]
+            #else
+            connections = []
+            #endif
         }
     }
 
@@ -302,12 +310,10 @@ enum ConnectionHubError: LocalizedError {
 
 // MARK: - Environment Key
 
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 private struct ConnectionHubKey: EnvironmentKey {
     static let defaultValue: ConnectionHub? = nil
 }
 
-@available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 extension EnvironmentValues {
     var connectionHub: ConnectionHub? {
         get { self[ConnectionHubKey.self] }
