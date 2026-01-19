@@ -1,5 +1,5 @@
 {
-  "originHash" : "0df9f60d4dcb15a1d8353dba239ca06294419159bd264aa243dbf344bc4856ae",
+  "originHash" : "69b419ee4b69988169e888f291e10a0edf7953a29e553047ac5df4d9ee98bd51",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "3498e60218e6003894ff95192d756e238c01f44e",
         "version" : "4.7.1"
+      }
+    },
+    {
+      "identity" : "pocketbase",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/briannadoubt/pocketbase",
+      "state" : {
+        "revision" : "de1a9e78af674136227f9e15b7fd1022c58c6ac1",
+        "version" : "0.4.1"
       }
     },
     {
