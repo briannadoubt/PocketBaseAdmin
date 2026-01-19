@@ -106,7 +106,6 @@
 		035DA1F62EEF6292003225F0 /* PocketBaseWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		035DA2002EEF6292003225F0 /* PocketBaseWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PocketBaseWidgetsExtension.entitlements; sourceTree = "<group>"; };
-		037F11EC2D8FE525009717C8 /* PocketBase */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = PocketBase; path = ../PocketBase; sourceTree = SOURCE_ROOT; };
 		039EF2CC2EF14FD200706404 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -192,7 +191,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				030D576F2E11FF0B000E174B /* NukeUI in Frameworks */,
-				03214DE82D881386004F65F1 /* KeyPathIterable in Frameworks */,
 				037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */,
 				03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */,
 				03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */,
@@ -260,7 +258,6 @@
 				035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */,
 				035DA1B22EEEBCD9003225F0 /* WidgetExtension.entitlements */,
 				03214DB42D87F778004F65F1 /* PocketBaseAdminApp */,
-				037F11EC2D8FE525009717C8 /* PocketBase */,
 				03214DC62D87F77A004F65F1 /* PocketBaseAdminTests */,
 				03214DD02D87F77A004F65F1 /* PocketBaseAdminUITests */,
 				03E6B07F2E165DC600920C8F /* PocketBase Watch App */,
