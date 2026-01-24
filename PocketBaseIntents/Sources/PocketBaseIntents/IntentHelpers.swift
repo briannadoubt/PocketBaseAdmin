@@ -78,8 +78,13 @@ public enum IntentHelpers {
     /// Fetch the count of warnings in the last 24 hours
     @MainActor
     public static func fetchWarningCount() async -> Int {
-        let logs = await fetchRecentLogs(limit: 100, level: .warning)
-        return logs.filter { $0.level == .warning }.count
+        do {
+            let intent = GetWarningCountIntent()
+            let result = try await intent.perform()
+            return result.value ?? 0
+        } catch {
+            return 0
+        }
     }
 
     // MARK: - Backups
@@ -149,7 +154,10 @@ public enum IntentHelpers {
     public struct BackupStatusResult: Sendable {
         public let backups: [SimpleBackup]
 
-        public var lastBackup: SimpleBackup? { backups.first }
+        /// Returns the most recent backup by created date
+        public var lastBackup: SimpleBackup? {
+            backups.max(by: { $0.created < $1.created })
+        }
         public var backupCount: Int { backups.count }
 
         public var lastBackupDate: Date? { lastBackup?.created }
