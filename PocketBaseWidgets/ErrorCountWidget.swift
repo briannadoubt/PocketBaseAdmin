@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -45,11 +46,14 @@ struct ErrorCountProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ErrorCountEntry>) -> Void) {
-        Task {
+        Task { @MainActor in
+            async let errorCount = IntentHelpers.fetchErrorCount()
+            async let warningCount = IntentHelpers.fetchWarningCount()
+
             let entry = ErrorCountEntry(
                 date: Date(),
-                errorCount: 0,
-                warningCount: 0,
+                errorCount: await errorCount,
+                warningCount: await warningCount,
                 period: "24h"
             )
 

@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -76,12 +77,14 @@ struct BackupStatusProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BackupStatusEntry>) -> Void) {
-        Task {
+        Task { @MainActor in
+            let backupStatus = await IntentHelpers.fetchBackupStatus()
+
             let entry = BackupStatusEntry(
                 date: Date(),
-                lastBackupDate: nil,
-                lastBackupName: nil,
-                backupCount: 0
+                lastBackupDate: backupStatus.lastBackupDate,
+                lastBackupName: backupStatus.lastBackupName,
+                backupCount: backupStatus.backupCount
             )
 
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date())!

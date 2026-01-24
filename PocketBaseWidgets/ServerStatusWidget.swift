@@ -8,6 +8,7 @@
 import WidgetKit
 import SwiftUI
 import AppIntents
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -38,16 +39,14 @@ struct ServerStatusProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ServerStatusEntry>) -> Void) {
-        Task {
-            let startTime = Date()
-            // TODO: Use actual server check
-            let latency = Date().timeIntervalSince(startTime)
+        Task { @MainActor in
+            let status = await IntentHelpers.fetchServerStatus()
 
             let entry = ServerStatusEntry(
                 date: Date(),
-                isOnline: true,
-                latency: latency,
-                lastChecked: Date()
+                isOnline: status.isOnline,
+                latency: status.latency,
+                lastChecked: status.checkedAt
             )
 
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!

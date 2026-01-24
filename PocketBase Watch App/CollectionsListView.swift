@@ -7,18 +7,41 @@
 
 import SwiftUI
 import WatchKit
+import PocketBaseIntents
 
 struct WatchCollection: Identifiable {
     let id: String
     let name: String
     let type: WatchCollectionType
     let recordCount: Int
+
+    init(id: String, name: String, type: WatchCollectionType, recordCount: Int) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.recordCount = recordCount
+    }
+
+    init(from simpleCollection: SimpleCollection) {
+        self.id = simpleCollection.id
+        self.name = simpleCollection.name
+        self.type = WatchCollectionType(from: simpleCollection.type)
+        self.recordCount = simpleCollection.recordCount
+    }
 }
 
 enum WatchCollectionType: String {
     case base
     case auth
     case view
+
+    init(from simpleType: SimpleCollectionType) {
+        switch simpleType {
+        case .base: self = .base
+        case .auth: self = .auth
+        case .view: self = .view
+        }
+    }
 
     var icon: String {
         switch self {
@@ -114,23 +137,15 @@ struct CollectionsListView: View {
         }
     }
 
+    @MainActor
     private func refresh() async {
         isLoading = true
         defer { isLoading = false }
 
         WKInterfaceDevice.current().play(.start)
 
-        // TODO: Use GetCollectionsIntent
-        // For now, use sample data
-        try? await Task.sleep(for: .milliseconds(500))
-
-        collections = [
-            WatchCollection(id: "1", name: "users", type: .auth, recordCount: 156),
-            WatchCollection(id: "2", name: "posts", type: .base, recordCount: 1234),
-            WatchCollection(id: "3", name: "comments", type: .base, recordCount: 5678),
-            WatchCollection(id: "4", name: "categories", type: .base, recordCount: 12),
-            WatchCollection(id: "5", name: "analytics", type: .view, recordCount: 0)
-        ]
+        let simpleCollections = await IntentHelpers.fetchCollections()
+        collections = simpleCollections.map { WatchCollection(from: $0) }
 
         WKInterfaceDevice.current().play(.success)
     }

@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -50,13 +51,15 @@ struct StatsProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatsEntry>) -> Void) {
-        Task {
+        Task { @MainActor in
+            let stats = await IntentHelpers.fetchStats()
+
             let entry = StatsEntry(
                 date: Date(),
-                collectionsCount: 0,
-                recordsCount: 0,
-                errorsCount: 0,
-                isOnline: true
+                collectionsCount: stats.collectionsCount,
+                recordsCount: stats.totalRecords,
+                errorsCount: stats.errorCount,
+                isOnline: stats.serverStatus.isOnline
             )
 
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!

@@ -7,6 +7,8 @@
 
 import SwiftUI
 import WatchKit
+import WidgetKit
+import PocketBaseIntents
 
 struct ActionsView: View {
     @State private var isCreatingBackup = false
@@ -76,6 +78,7 @@ struct ActionsView: View {
         }
     }
 
+    @MainActor
     private func createBackup() async {
         isCreatingBackup = true
         errorMessage = nil
@@ -86,12 +89,12 @@ struct ActionsView: View {
         defer { isCreatingBackup = false }
 
         do {
-            // TODO: Use CreateBackupIntent
-            // For now, simulate
-            try await Task.sleep(for: .seconds(2))
-
-            lastBackupDate = Date()
+            let backup = try await IntentHelpers.createBackup()
+            lastBackupDate = backup.created
             showBackupConfirmation = true
+
+            // Refresh widgets to show new backup
+            WidgetCenter.shared.reloadAllTimelines()
 
             // Success haptic
             WKInterfaceDevice.current().play(.success)
@@ -103,7 +106,7 @@ struct ActionsView: View {
 
     private func refreshWidgets() {
         WKInterfaceDevice.current().play(.click)
-        // TODO: Trigger widget refresh via WidgetCenter
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

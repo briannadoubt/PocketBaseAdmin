@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WatchKit
+import PocketBaseIntents
 
 struct StatusView: View {
     @State private var isOnline = true
@@ -78,6 +79,7 @@ struct StatusView: View {
         }
     }
 
+    @MainActor
     private func refresh() async {
         isRefreshing = true
         defer { isRefreshing = false }
@@ -85,12 +87,14 @@ struct StatusView: View {
         // Haptic feedback
         WKInterfaceDevice.current().play(.start)
 
-        // TODO: Use CheckServerStatusIntent
-        // For now, simulate
-        try? await Task.sleep(for: .milliseconds(500))
+        // Fetch stats using IntentHelpers
+        let stats = await IntentHelpers.fetchStats()
 
-        lastChecked = Date()
-        latency = 0.042
+        isOnline = stats.serverStatus.isOnline
+        latency = stats.serverStatus.latency
+        lastChecked = stats.serverStatus.checkedAt
+        collectionsCount = stats.collectionsCount
+        errorsCount = stats.errorCount
 
         // Success haptic
         WKInterfaceDevice.current().play(.success)

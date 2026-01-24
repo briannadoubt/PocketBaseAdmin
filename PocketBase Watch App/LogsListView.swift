@@ -7,12 +7,27 @@
 
 import SwiftUI
 import WatchKit
+import PocketBaseIntents
 
 struct WatchLogEntry: Identifiable {
     let id: String
     let level: WatchLogLevel
     let message: String
     let timestamp: Date
+
+    init(id: String, level: WatchLogLevel, message: String, timestamp: Date) {
+        self.id = id
+        self.level = level
+        self.message = message
+        self.timestamp = timestamp
+    }
+
+    init(from simpleLog: SimpleLogEntry) {
+        self.id = simpleLog.id
+        self.level = WatchLogLevel(from: simpleLog.level)
+        self.message = simpleLog.message
+        self.timestamp = simpleLog.created
+    }
 }
 
 enum WatchLogLevel: Int {
@@ -20,6 +35,15 @@ enum WatchLogLevel: Int {
     case info = 0
     case warning = 4
     case error = 8
+
+    init(from simpleLevel: SimpleLogLevel) {
+        switch simpleLevel {
+        case .debug: self = .debug
+        case .info: self = .info
+        case .warning: self = .warning
+        case .error: self = .error
+        }
+    }
 
     var color: Color {
         switch self {
@@ -128,23 +152,15 @@ struct LogsListView: View {
         }
     }
 
+    @MainActor
     private func refresh() async {
         isLoading = true
         defer { isLoading = false }
 
         WKInterfaceDevice.current().play(.start)
 
-        // TODO: Use GetRecentLogsIntent
-        // For now, use sample data
-        try? await Task.sleep(for: .milliseconds(500))
-
-        logs = [
-            WatchLogEntry(id: "1", level: .info, message: "Request completed", timestamp: Date()),
-            WatchLogEntry(id: "2", level: .warning, message: "Slow query", timestamp: Date().addingTimeInterval(-300)),
-            WatchLogEntry(id: "3", level: .error, message: "Connection timeout", timestamp: Date().addingTimeInterval(-600)),
-            WatchLogEntry(id: "4", level: .info, message: "User logged in", timestamp: Date().addingTimeInterval(-900)),
-            WatchLogEntry(id: "5", level: .error, message: "Auth failed", timestamp: Date().addingTimeInterval(-1200))
-        ]
+        let simpleLogs = await IntentHelpers.fetchRecentLogs(limit: 20)
+        logs = simpleLogs.map { WatchLogEntry(from: $0) }
 
         WKInterfaceDevice.current().play(.success)
     }

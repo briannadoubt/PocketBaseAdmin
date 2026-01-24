@@ -7,6 +7,8 @@
 
 import SwiftUI
 import WatchKit
+import UserNotifications
+import PocketBaseIntents
 
 @main
 struct PocketBaseApp: App {
@@ -57,8 +59,34 @@ class AppDelegate: NSObject, WKApplicationDelegate {
         }
     }
 
+    @MainActor
     private func performBackgroundHealthCheck() async {
-        // TODO: Use CheckServerStatusIntent to check health
+        // Check server status
+        let status = await IntentHelpers.fetchServerStatus()
+
+        // Get the previous status from UserDefaults
+        let wasOnline = UserDefaults.standard.bool(forKey: "lastServerStatus")
+        UserDefaults.standard.set(status.isOnline, forKey: "lastServerStatus")
+
         // If status changed, send local notification
+        if wasOnline != status.isOnline {
+            let content = UNMutableNotificationContent()
+            if status.isOnline {
+                content.title = "PocketBase Online"
+                content.body = "Your server is back online"
+            } else {
+                content.title = "PocketBase Offline"
+                content.body = "Your server is not responding"
+            }
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: nil
+            )
+
+            try? await UNUserNotificationCenter.current().add(request)
+        }
     }
 }

@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -46,18 +47,20 @@ struct ServerStatusProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ServerStatusEntry>) -> Void) {
-        Task {
-            // TODO: Use CheckServerStatusIntent to get real data
-            // let intent = CheckServerStatusIntent()
-            // let status = try? await intent.perform().value
+        Task { @MainActor in
+            // Fetch all data in parallel
+            async let status = IntentHelpers.fetchServerStatus()
+            async let collections = IntentHelpers.fetchCollections()
+            async let errorCount = IntentHelpers.fetchErrorCount()
+            async let backupStatus = IntentHelpers.fetchBackupStatus()
 
             let entry = ServerStatusEntry(
                 date: Date(),
-                isOnline: true,
-                latency: 0.042,
-                errorCount: 0,
-                lastBackup: Date().addingTimeInterval(-3600),
-                collectionsCount: 5
+                isOnline: await status.isOnline,
+                latency: await status.latency,
+                errorCount: await errorCount,
+                lastBackup: await backupStatus.lastBackupDate,
+                collectionsCount: await collections.count
             )
 
             // Refresh every 15 minutes
