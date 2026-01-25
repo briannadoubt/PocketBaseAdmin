@@ -129,10 +129,9 @@ struct ConnectionPickerView: View {
     // MARK: - Actions
 
     private func openConnection(_ connection: Connection) {
-        #if os(macOS)
-        openWindow(value: connection.id.uuidString)
+        // Connection switching is handled in the main window
+        // Just dismiss the picker and the main window will show the selected connection
         dismiss()
-        #endif
     }
 
     private func deleteConnections(at offsets: IndexSet) {
@@ -158,13 +157,8 @@ struct ConnectionPickerView: View {
             Label("Open", systemImage: "arrow.up.forward.app")
         }
 
-        #if os(macOS)
-        Button {
-            openWindow(value: connection.id)
-        } label: {
-            Label("Open in New Window", systemImage: "uiwindow.split.2x1")
-        }
-        #endif
+        // REMOVED: Multi-window support - no WindowGroup defined for per-connection windows
+        // The app uses a single main window that switches between connections
 
         Divider()
 

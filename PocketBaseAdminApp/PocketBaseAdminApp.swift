@@ -95,12 +95,11 @@ struct ConnectionCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("New Connection Window") {
-                openWindow(value: UUID?.none)
-            }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-
-            Divider()
+            // REMOVED: New Connection Window - no WindowGroup for per-connection windows
+            // Button("New Connection Window") {
+            //     openWindow(value: UUID?.none)
+            // }
+            // .keyboardShortcut("n", modifiers: [.command, .shift])
 
             Button("Show Connections") {
                 openWindow(id: "connections")
