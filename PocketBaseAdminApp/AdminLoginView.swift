@@ -235,8 +235,7 @@ struct AdminLoginView: View {
         defer { isLoading = false }
 
         do {
-            let collection = pocketbase.collection(Superuser.self)
-            _ = try await collection.authWithPassword(
+            _ = try await pocketbase.admin.auth.authWithPassword(
                 email,
                 password: password
             )
