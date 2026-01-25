@@ -311,7 +311,15 @@ struct ConnectionWindow: View {
 
         // Validate the token by attempting to refresh it
         // If invalid, it will be automatically cleared
-        isAuthenticated = await pocketbase.admin.auth.validateToken()
+        do {
+            let collection = pocketbase.collection(Superuser.self)
+            _ = try await collection.authRefresh()
+            isAuthenticated = true
+        } catch {
+            // Token is invalid, clear it
+            pocketbase.authStore.clear()
+            isAuthenticated = false
+        }
         isCheckingAuth = false
     }
 
