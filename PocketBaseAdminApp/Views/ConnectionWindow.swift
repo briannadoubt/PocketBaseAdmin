@@ -302,7 +302,16 @@ struct ConnectionWindow: View {
     private func checkAuthentication() async {
         // Small delay to let authStore initialize
         try? await Task.sleep(for: .milliseconds(100))
-        isAuthenticated = pocketbase?.authStore.isValid ?? false
+
+        guard let pocketbase else {
+            isAuthenticated = false
+            isCheckingAuth = false
+            return
+        }
+
+        // Validate the token by attempting to refresh it
+        // If invalid, it will be automatically cleared
+        isAuthenticated = await pocketbase.admin.auth.validateToken()
         isCheckingAuth = false
     }
 
