@@ -15,7 +15,7 @@ struct AddConnectionView: View {
 
     @State private var name = ""
     @State private var host = ""
-    @State private var port = "8090"
+    @State private var port = ""
     @State private var useTLS = false
     @State private var isLoading = false
     @State private var error: String?
@@ -25,13 +25,16 @@ struct AddConnectionView: View {
             Form {
                 Section {
                     TextField("Name", text: $name, prompt: Text("My PocketBase Server"))
-                    TextField("Host", text: $host, prompt: Text("example.com or 192.168.1.100"))
+                    TextField("Host", text: $host, prompt: Text("example.com or https://example.com"))
                         #if os(iOS)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
                         #endif
                         .autocorrectionDisabled()
-                    TextField("Port", text: $port, prompt: Text("8090"))
+                        .onChange(of: host) { _, newValue in
+                            parseHostInput(newValue)
+                        }
+                    TextField("Port", text: $port, prompt: Text("Optional (defaults to 443/80)"))
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
@@ -97,17 +100,63 @@ struct AddConnectionView: View {
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !host.trimmingCharacters(in: .whitespaces).isEmpty &&
-        Int(port) != nil
+        !cleanHost.isEmpty &&
+        (port.isEmpty || Int(port) != nil)
+    }
+
+    private var cleanHost: String {
+        host.trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+    }
+
+    private var effectivePort: Int {
+        if let portInt = Int(port), !port.isEmpty {
+            return portInt
+        }
+        return useTLS ? 443 : 80
     }
 
     private var previewURL: URL? {
-        guard isValid, let portInt = Int(port) else { return nil }
+        guard isValid else { return nil }
         let scheme = useTLS ? "https" : "http"
-        return URL(string: "\(scheme)://\(host.trimmingCharacters(in: .whitespaces)):\(portInt)")
+        let portInt = effectivePort
+
+        // Don't show default ports in URL
+        if (useTLS && portInt == 443) || (!useTLS && portInt == 80) {
+            return URL(string: "\(scheme)://\(cleanHost)")
+        }
+        return URL(string: "\(scheme)://\(cleanHost):\(portInt)")
     }
 
     // MARK: - Actions
+
+    private func parseHostInput(_ input: String) {
+        let trimmed = input.trimmingCharacters(in: .whitespaces)
+
+        // Try to parse as URL if it contains ://
+        if trimmed.contains("://"), let url = URL(string: trimmed) {
+            // Extract host (remove protocol)
+            if let urlHost = url.host {
+                host = urlHost
+            }
+
+            // Auto-detect TLS from protocol
+            if url.scheme == "https" {
+                useTLS = true
+            } else if url.scheme == "http" {
+                useTLS = false
+            }
+
+            // Extract port if specified
+            if let urlPort = url.port {
+                port = String(urlPort)
+            } else {
+                // Clear port to use default
+                port = ""
+            }
+        }
+    }
 
     private func testConnection() {
         guard let url = previewURL else { return }
@@ -138,12 +187,12 @@ struct AddConnectionView: View {
     }
 
     private func addConnection() {
-        guard isValid, let portInt = Int(port) else { return }
+        guard isValid else { return }
 
         let connection = Connection(
             name: name.trimmingCharacters(in: .whitespaces),
-            host: host.trimmingCharacters(in: .whitespaces),
-            port: portInt,
+            host: cleanHost,
+            port: effectivePort,
             useTLS: useTLS
         )
 
