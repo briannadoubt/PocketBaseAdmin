@@ -134,8 +134,14 @@ final class ConnectionHub {
             return existing
         }
 
-        // Create new PocketBase instance
-        let pb = PocketBase(url: connection.url)
+        // Create connection-specific AuthStore to isolate auth between connections
+        // Use the connection ID as part of the service name to ensure complete isolation
+        let authStore = AuthStore(
+            service: "io.pocketbase.auth.\(connection.id.uuidString)"
+        )
+
+        // Create new PocketBase instance with isolated auth store
+        let pb = PocketBase(url: connection.url, authStore: authStore)
 
         // Store the active connection
         activeConnections[connection.id] = pb

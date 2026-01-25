@@ -130,7 +130,7 @@ struct ConnectionPickerView: View {
 
     private func openConnection(_ connection: Connection) {
         #if os(macOS)
-        openWindow(value: connection.id)
+        openWindow(value: connection.id.uuidString)
         dismiss()
         #endif
     }

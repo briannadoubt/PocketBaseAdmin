@@ -191,11 +191,13 @@ struct ConnectionWindow: View {
                 connectionName: connection.name
             )
             .pocketbase(pocketbase)
+            .id(connection.id) // Force recreation when connection changes
         } else {
             AdminLoginView {
                 isAuthenticated = true
             }
             .pocketbase(pocketbase)
+            .id(connection.id) // Force recreation when connection changes
         }
     }
 
