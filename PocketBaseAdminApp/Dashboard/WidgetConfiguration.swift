@@ -476,6 +476,10 @@ struct ErrorDistributionData: Equatable {
         var color: Color
 
         var id: String { name }
+
+        static func == (lhs: ErrorCategory, rhs: ErrorCategory) -> Bool {
+            lhs.name == rhs.name && lhs.count == rhs.count
+        }
     }
 
     var totalErrors: Int {
@@ -531,6 +535,10 @@ struct ResponseCodesData: Equatable {
         var color: Color
 
         var id: String { statusGroup }
+
+        static func == (lhs: CodeStat, rhs: CodeStat) -> Bool {
+            lhs.statusGroup == rhs.statusGroup && lhs.count == rhs.count
+        }
     }
 
     var totalRequests: Int {

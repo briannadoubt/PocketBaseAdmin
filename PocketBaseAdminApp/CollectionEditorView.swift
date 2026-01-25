@@ -44,9 +44,16 @@ struct CollectionEditorView: View {
     @State private var authAlertSubject: String = ""
     @State private var authAlertBody: String = ""
 
+    // OAuth2 configuration
+    @State private var oauth2Enabled: Bool = false
+    @State private var oauth2Providers: [EditableOAuth2Provider] = []
+    @State private var passwordAuthEnabled: Bool = true
+    @State private var passwordAuthIdentityFields: [String] = ["email"]
+
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var fieldEditorMode: FieldEditorMode?
+    @State private var showingOAuth2Providers = false
 
     /// Mode for the field editor sheet
     enum FieldEditorMode: Identifiable {
@@ -186,6 +193,29 @@ struct CollectionEditorView: View {
                             )
                         }
                     }
+
+                    Section("Authentication Methods") {
+                        Toggle("Password Authentication", isOn: $passwordAuthEnabled)
+
+                        Toggle("OAuth2", isOn: $oauth2Enabled)
+
+                        if oauth2Enabled {
+                            Button {
+                                showingOAuth2Providers = true
+                            } label: {
+                                HStack {
+                                    Text("OAuth2 Providers")
+                                    Spacer()
+                                    Text("\(oauth2Providers.count)")
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -309,6 +339,14 @@ struct CollectionEditorView: View {
             authAlertEnabled = collection.authAlert?.enabled ?? false
             authAlertSubject = collection.authAlert?.emailTemplate?.subject ?? ""
             authAlertBody = collection.authAlert?.emailTemplate?.body ?? ""
+
+            // Load OAuth2 configuration
+            oauth2Enabled = collection.oauth2?.enabled ?? false
+            oauth2Providers = (collection.oauth2?.providers ?? []).map { EditableOAuth2Provider(from: $0) }
+
+            // Load password auth configuration
+            passwordAuthEnabled = collection.passwordAuth?.enabled ?? true
+            passwordAuthIdentityFields = collection.passwordAuth?.identityFields ?? ["email"]
         }
     }
 
@@ -334,6 +372,20 @@ struct CollectionEditorView: View {
                     ? EmailTemplate(subject: authAlertSubject, body: authAlertBody) : nil
             ) : nil
 
+        // Build OAuth2 configuration for auth collections
+        let oauth2Config: OAuth2Config? = type == .auth
+            ? OAuth2Config(
+                enabled: oauth2Enabled,
+                providers: oauth2Enabled ? oauth2Providers.map { $0.toOAuth2ProviderConfig() } : nil
+            ) : nil
+
+        // Build password auth configuration for auth collections
+        let passwordAuthConfig: PasswordAuthConfig? = type == .auth
+            ? PasswordAuthConfig(
+                enabled: passwordAuthEnabled,
+                identityFields: passwordAuthEnabled ? passwordAuthIdentityFields : nil
+            ) : nil
+
         do {
             let savedCollection: CollectionModel
 
@@ -350,7 +402,9 @@ struct CollectionEditorView: View {
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,
-                    authAlert: authAlertConfig
+                    authAlert: authAlertConfig,
+                    oauth2: oauth2Config,
+                    passwordAuth: passwordAuthConfig
                 )
                 savedCollection = try await pocketbase.admin.collections.update(id: collection.id, request)
             } else {
@@ -367,7 +421,9 @@ struct CollectionEditorView: View {
                     verificationTemplate: verification,
                     resetPasswordTemplate: resetPassword,
                     confirmEmailChangeTemplate: confirmEmailChange,
-                    authAlert: authAlertConfig
+                    authAlert: authAlertConfig,
+                    oauth2: oauth2Config,
+                    passwordAuth: passwordAuthConfig
                 )
                 savedCollection = try await pocketbase.admin.collections.create(request)
             }
@@ -634,5 +690,328 @@ struct FieldRow: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - OAuth2 Provider Models
+
+/// Mutable version of OAuth2ProviderConfig for editing purposes
+struct EditableOAuth2Provider: Identifiable, Equatable {
+    var id: String
+    var name: String
+    var clientId: String
+    var clientSecret: String
+    var authURL: String
+    var tokenURL: String
+    var userInfoURL: String
+    var displayName: String
+    var pkce: Bool
+
+    init(
+        id: String = UUID().uuidString,
+        name: String = "",
+        clientId: String = "",
+        clientSecret: String = "",
+        authURL: String = "",
+        tokenURL: String = "",
+        userInfoURL: String = "",
+        displayName: String = "",
+        pkce: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.clientId = clientId
+        self.clientSecret = clientSecret
+        self.authURL = authURL
+        self.tokenURL = tokenURL
+        self.userInfoURL = userInfoURL
+        self.displayName = displayName
+        self.pkce = pkce
+    }
+
+    init(from provider: OAuth2ProviderConfig) {
+        self.id = UUID().uuidString
+        self.name = provider.name
+        self.clientId = provider.clientId
+        self.clientSecret = provider.clientSecret
+        self.authURL = provider.authURL ?? ""
+        self.tokenURL = provider.tokenURL ?? ""
+        self.userInfoURL = provider.userInfoURL ?? ""
+        self.displayName = provider.displayName ?? ""
+        self.pkce = provider.pkce ?? false
+    }
+
+    func toOAuth2ProviderConfig() -> OAuth2ProviderConfig {
+        OAuth2ProviderConfig(
+            name: name,
+            clientId: clientId,
+            clientSecret: clientSecret,
+            authURL: authURL.isEmpty ? nil : authURL,
+            tokenURL: tokenURL.isEmpty ? nil : tokenURL,
+            userInfoURL: userInfoURL.isEmpty ? nil : userInfoURL,
+            displayName: displayName.isEmpty ? nil : displayName,
+            pkce: pkce ? true : nil
+        )
+    }
+}
+
+// MARK: - OAuth2 Provider Templates
+
+extension EditableOAuth2Provider {
+    static var google: EditableOAuth2Provider {
+        EditableOAuth2Provider(
+            name: "google",
+            authURL: "https://accounts.google.com/o/oauth2/v2/auth",
+            tokenURL: "https://oauth2.googleapis.com/token",
+            userInfoURL: "https://www.googleapis.com/oauth2/v2/userinfo",
+            displayName: "Google",
+            pkce: true
+        )
+    }
+
+    static var github: EditableOAuth2Provider {
+        EditableOAuth2Provider(
+            name: "github",
+            authURL: "https://github.com/login/oauth/authorize",
+            tokenURL: "https://github.com/login/oauth/access_token",
+            userInfoURL: "https://api.github.com/user",
+            displayName: "GitHub",
+            pkce: false
+        )
+    }
+
+    static var discord: EditableOAuth2Provider {
+        EditableOAuth2Provider(
+            name: "discord",
+            authURL: "https://discord.com/api/oauth2/authorize",
+            tokenURL: "https://discord.com/api/oauth2/token",
+            userInfoURL: "https://discord.com/api/users/@me",
+            displayName: "Discord",
+            pkce: false
+        )
+    }
+
+    static var microsoft: EditableOAuth2Provider {
+        EditableOAuth2Provider(
+            name: "microsoft",
+            authURL: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoURL: "https://graph.microsoft.com/v1.0/me",
+            displayName: "Microsoft",
+            pkce: true
+        )
+    }
+
+    static var apple: EditableOAuth2Provider {
+        EditableOAuth2Provider(
+            name: "apple",
+            authURL: "https://appleid.apple.com/auth/authorize",
+            tokenURL: "https://appleid.apple.com/auth/token",
+            userInfoURL: "",
+            displayName: "Apple",
+            pkce: false
+        )
+    }
+
+    static var templates: [EditableOAuth2Provider] {
+        [.google, .github, .discord, .microsoft, .apple]
+    }
+}
+
+// MARK: - OAuth2 Providers Editor View
+
+struct OAuth2ProvidersEditorView: View {
+    @Binding var providers: [EditableOAuth2Provider]
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedProvider: EditableOAuth2Provider?
+    @State private var showingTemplates = false
+
+    var body: some View {
+        List {
+            Section {
+                if providers.isEmpty {
+                    Text("No OAuth2 providers configured")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(providers) { provider in
+                        Button {
+                            selectedProvider = provider
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(provider.displayName.isEmpty ? provider.name : provider.displayName)
+                                        .font(.headline)
+                                    Text(provider.name)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                    .onDelete { indexSet in
+                        providers.remove(atOffsets: indexSet)
+                    }
+                }
+            }
+
+            Section {
+                Button {
+                    showingTemplates = true
+                } label: {
+                    Label("Add from Template", systemImage: "plus.rectangle.on.folder")
+                }
+
+                Button {
+                    let newProvider = EditableOAuth2Provider()
+                    providers.append(newProvider)
+                    selectedProvider = newProvider
+                } label: {
+                    Label("Add Custom Provider", systemImage: "plus.circle")
+                }
+            }
+        }
+        .navigationTitle("OAuth2 Providers")
+        #if !os(macOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .sheet(item: $selectedProvider) { provider in
+            if let index = providers.firstIndex(where: { $0.id == provider.id }) {
+                OAuth2ProviderEditorView(provider: $providers[index])
+            }
+        }
+        .sheet(isPresented: $showingTemplates) {
+            OAuth2ProviderTemplatesView { template in
+                providers.append(template)
+                selectedProvider = template
+            }
+        }
+    }
+}
+
+// MARK: - OAuth2 Provider Editor View
+
+struct OAuth2ProviderEditorView: View {
+    @Binding var provider: EditableOAuth2Provider
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Provider Details") {
+                    TextField("Provider Name", text: $provider.name)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    #endif
+
+                    TextField("Display Name", text: $provider.displayName)
+                }
+
+                Section("OAuth2 Credentials") {
+                    TextField("Client ID", text: $provider.clientId)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    #endif
+
+                    SecureField("Client Secret", text: $provider.clientSecret)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    #endif
+                }
+
+                Section("OAuth2 Endpoints") {
+                    TextField("Authorization URL", text: $provider.authURL)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    #endif
+
+                    TextField("Token URL", text: $provider.tokenURL)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    #endif
+
+                    TextField("User Info URL", text: $provider.userInfoURL)
+                    #if os(iOS)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    #endif
+                }
+
+                Section("Options") {
+                    Toggle("PKCE (Recommended)", isOn: $provider.pkce)
+                }
+
+                Section {
+                    Text("PKCE (Proof Key for Code Exchange) is a security extension recommended for mobile and web applications.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Edit Provider")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - OAuth2 Provider Templates View
+
+struct OAuth2ProviderTemplatesView: View {
+    let onSelect: (EditableOAuth2Provider) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(EditableOAuth2Provider.templates) { template in
+                Button {
+                    onSelect(template)
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(template.displayName)
+                                .font(.headline)
+                            Text(template.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+            .navigationTitle("Provider Templates")
+            #if !os(macOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
