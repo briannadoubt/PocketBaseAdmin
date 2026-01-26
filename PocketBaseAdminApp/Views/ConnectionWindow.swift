@@ -257,6 +257,12 @@ struct ConnectionWindow: View {
             let pb = try await hub.connect(to: connection)
             self.pocketbase = pb
 
+            // Debug: Verify we're using the correct instance
+            print("🔌 Connected to: \(connection.name)")
+            print("   Connection ID: \(connection.id)")
+            print("   URL: \(pb.url)")
+            print("   Has token: \(pb.authStore.token != nil)")
+
             // Check if instance needs initial setup
             let needsInitialSetup = await checkNeedsSetup(pb)
             if needsInitialSetup {

@@ -162,8 +162,10 @@ struct NewArchitectureRootView: View {
         Group {
             if let connectionID = selectedConnectionID {
                 ConnectionWindow(connectionID: connectionID, onSwitchConnection: switchConnectionAction)
+                    .id(connectionID) // Force recreation when connection changes
             } else if let firstConnection = hub.connections.first {
                 ConnectionWindow(connectionID: firstConnection.id, onSwitchConnection: switchConnectionAction)
+                    .id(firstConnection.id) // Force recreation when connection changes
                     .onAppear {
                         selectedConnectionID = firstConnection.id
                     }
