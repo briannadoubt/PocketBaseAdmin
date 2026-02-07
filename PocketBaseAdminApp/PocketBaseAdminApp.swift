@@ -153,7 +153,8 @@ struct NewArchitectureRootView: View {
             }
         #else
             .sheet(isPresented: $showingConnectionPicker) {
-                ConnectionPickerSheet(hub: hub, selectedConnectionID: $selectedConnectionID)
+                ConnectionPickerView(selectedConnectionID: $selectedConnectionID)
+                    .environment(hub)
             }
         #endif
     }
@@ -242,141 +243,6 @@ struct NewArchitectureRootView: View {
         }
     }
 }
-
-/// Connection picker sheet for iOS
-#if !os(macOS)
-struct ConnectionPickerSheet: View {
-    let hub: ConnectionHub
-    @Binding var selectedConnectionID: UUID?
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var isAddingManually = false
-    @State private var manualHost = ""
-    @State private var manualPort = "8090"
-    @State private var manualName = ""
-    @State private var useTLS = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // Saved connections
-                if !hub.connections.isEmpty {
-                    Section("Saved") {
-                        ForEach(hub.connections) { connection in
-                            Button {
-                                selectedConnectionID = connection.id
-                                dismiss()
-                            } label: {
-                                HStack {
-                                    Image(systemName: connection.statusIcon)
-                                        .foregroundStyle(connection.id == selectedConnectionID ? .green : .secondary)
-
-                                    VStack(alignment: .leading) {
-                                        Text(connection.name)
-                                            .foregroundStyle(.primary)
-                                        Text(connection.displayURL)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    if connection.id == selectedConnectionID {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(.tint)
-                                    }
-                                }
-                            }
-                        }
-                        .onDelete { indexSet in
-                            Task {
-                                for index in indexSet {
-                                    try? await hub.remove(hub.connections[index])
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Discovered instances
-                if !hub.discoveredInstances.isEmpty {
-                    Section("Discovered on Network") {
-                        ForEach(hub.discoveredInstances) { instance in
-                            Button {
-                                Task {
-                                    try? await hub.addDiscoveredInstance(instance)
-                                    if let added = hub.connections.last {
-                                        selectedConnectionID = added.id
-                                    }
-                                    dismiss()
-                                }
-                            } label: {
-                                HStack {
-                                    Image(systemName: "bonjour")
-                                        .foregroundStyle(.orange)
-
-                                    VStack(alignment: .leading) {
-                                        Text(instance.name)
-                                            .foregroundStyle(.primary)
-                                        Text("\(instance.host):\(instance.port)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Add manually
-                Section("Add Connection") {
-                    TextField("Name", text: $manualName)
-                    TextField("Host (e.g. 192.168.1.100)", text: $manualHost)
-                        .textContentType(.URL)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                    TextField("Port", text: $manualPort)
-                        .keyboardType(.numberPad)
-                    Toggle("Use HTTPS", isOn: $useTLS)
-
-                    Button("Add") {
-                        addManualConnection()
-                    }
-                    .disabled(manualHost.isEmpty)
-                }
-            }
-            .navigationTitle("Connections")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-
-    private func addManualConnection() {
-        let port = Int(manualPort) ?? 8090
-        let name = manualName.isEmpty ? manualHost : manualName
-        let connection = Connection(
-            id: UUID(),
-            name: name,
-            host: manualHost,
-            port: port,
-            useTLS: useTLS,
-            isLocal: false,
-            discoveredViaBonjour: false
-        )
-        Task {
-            try? await hub.add(connection)
-            selectedConnectionID = connection.id
-            dismiss()
-        }
-    }
-}
-#endif
 
 #if os(macOS)
 /// Toolbar picker for switching between connections
