@@ -14,13 +14,11 @@
 		035DA1DB2EEF3CA5003225F0 /* PocketBaseWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		035DA1E12EEF3EBC003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E02EEF3EBC003225F0 /* PocketBase */; };
 		035DA1E32EEF3EBC003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */; };
-		035DA1E52EEF3EC1003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */; };
 		035DA20A2EEF6292003225F0 /* PocketBaseWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		035DA2152EEF6320003225F0 /* PocketBase in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2142EEF6320003225F0 /* PocketBase */; };
 		035DA2172EEF6320003225F0 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2162EEF6320003225F0 /* PocketBaseAdmin */; };
-		035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 035DA2182EEF6326003225F0 /* PocketBaseIntents */; };
 		037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */ = {isa = PBXBuildFile; productRef = 037F11EE2D90A587009717C8 /* PocketBaseAdmin */; };
-		03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = 03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */; };
+		03979B692F25E4EB00D15B99 /* PocketBaseIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 03979B682F25E4EB00D15B99 /* PocketBaseIntents */; };
 		03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */ = {isa = PBXBuildFile; productRef = 03EAC97C2D92746200E85F29 /* PocketBaseUI */; };
 /* End PBXBuildFile section */
 
@@ -106,6 +104,8 @@
 		035DA1F62EEF6292003225F0 /* PocketBaseWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		035DA2002EEF6292003225F0 /* PocketBaseWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PocketBaseWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PocketBaseWidgetsExtension.entitlements; sourceTree = "<group>"; };
+		03979A882F25E45200D15B99 /* PocketBase */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = PocketBase; path = ../PocketBase; sourceTree = SOURCE_ROOT; };
+		03979A892F25E48200D15B99 /* PocketBaseIntents */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PocketBaseIntents; sourceTree = "<group>"; };
 		039EF2CC2EF14FD200706404 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -192,7 +192,6 @@
 			files = (
 				030D576F2E11FF0B000E174B /* NukeUI in Frameworks */,
 				037F11EF2D90A587009717C8 /* PocketBaseAdmin in Frameworks */,
-				03E7D9A72F1A28C9004233F5 /* PocketBaseServerLib in Frameworks */,
 				03EAC97D2D92746200E85F29 /* PocketBaseUI in Frameworks */,
 				035DA1712EEEBAFA003225F0 /* PocketBaseIntents in Frameworks */,
 			);
@@ -216,7 +215,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				035DA1E52EEF3EC1003225F0 /* PocketBaseIntents in Frameworks */,
+				03979B692F25E4EB00D15B99 /* PocketBaseIntents in Frameworks */,
 				035DA1CE2EEF3CA4003225F0 /* SwiftUI.framework in Frameworks */,
 				035DA1E32EEF3EBC003225F0 /* PocketBaseAdmin in Frameworks */,
 				035DA1CD2EEF3CA4003225F0 /* WidgetKit.framework in Frameworks */,
@@ -230,7 +229,6 @@
 			files = (
 				035DA2152EEF6320003225F0 /* PocketBase in Frameworks */,
 				035DA2172EEF6320003225F0 /* PocketBaseAdmin in Frameworks */,
-				035DA2192EEF6326003225F0 /* PocketBaseIntents in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,6 +252,8 @@
 		03214DA92D87F778004F65F1 = {
 			isa = PBXGroup;
 			children = (
+				03979A892F25E48200D15B99 /* PocketBaseIntents */,
+				03979A882F25E45200D15B99 /* PocketBase */,
 				039EF2CC2EF14FD200706404 /* CLAUDE.md */,
 				035DA21D2EEF6409003225F0 /* PocketBaseWidgetsExtension.entitlements */,
 				035DA1B22EEEBCD9003225F0 /* WidgetExtension.entitlements */,
@@ -323,7 +323,6 @@
 				03EAC97C2D92746200E85F29 /* PocketBaseUI */,
 				030D576E2E11FF0B000E174B /* NukeUI */,
 				035DA1702EEEBAFA003225F0 /* PocketBaseIntents */,
-				03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */,
 			);
 			productName = PocketBaseAdmin;
 			productReference = 03214DB22D87F778004F65F1 /* PocketBaseAdminApp.app */;
@@ -394,7 +393,7 @@
 			packageProductDependencies = (
 				035DA1E02EEF3EBC003225F0 /* PocketBase */,
 				035DA1E22EEF3EBC003225F0 /* PocketBaseAdmin */,
-				035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */,
+				03979B682F25E4EB00D15B99 /* PocketBaseIntents */,
 			);
 			productName = PocketBaseWidgetsExtension;
 			productReference = 035DA1CC2EEF3CA3003225F0 /* PocketBaseWidgetsExtension.appex */;
@@ -419,7 +418,6 @@
 			packageProductDependencies = (
 				035DA2142EEF6320003225F0 /* PocketBase */,
 				035DA2162EEF6320003225F0 /* PocketBaseAdmin */,
-				035DA2182EEF6326003225F0 /* PocketBaseIntents */,
 			);
 			productName = "PocketBaseWatch Watch App";
 			productReference = 035DA1EA2EEF6290003225F0 /* PocketBaseWatch Watch App.app */;
@@ -520,7 +518,6 @@
 			packageReferences = (
 				03214DE02D880955004F65F1 /* XCRemoteSwiftPackageReference "pocketbase" */,
 				030D576D2E11FF0B000E174B /* XCRemoteSwiftPackageReference "Nuke" */,
-				035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 03214DB32D87F778004F65F1 /* Products */;
@@ -1350,13 +1347,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = PocketBaseIntents;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		030D576D2E11FF0B000E174B /* XCRemoteSwiftPackageReference "Nuke" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1394,11 +1384,6 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = PocketBaseAdmin;
 		};
-		035DA1E42EEF3EC1003225F0 /* PocketBaseIntents */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */;
-			productName = PocketBaseIntents;
-		};
 		035DA2142EEF6320003225F0 /* PocketBase */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PocketBase;
@@ -1407,18 +1392,13 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = PocketBaseAdmin;
 		};
-		035DA2182EEF6326003225F0 /* PocketBaseIntents */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 035DA16F2EEEBAFA003225F0 /* XCLocalSwiftPackageReference "PocketBaseIntents" */;
-			productName = PocketBaseIntents;
-		};
 		037F11EE2D90A587009717C8 /* PocketBaseAdmin */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PocketBaseAdmin;
 		};
-		03E7D9A62F1A28C9004233F5 /* PocketBaseServerLib */ = {
+		03979B682F25E4EB00D15B99 /* PocketBaseIntents */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = PocketBaseServerLib;
+			productName = PocketBaseIntents;
 		};
 		03EAC97C2D92746200E85F29 /* PocketBaseUI */ = {
 			isa = XCSwiftPackageProductDependency;

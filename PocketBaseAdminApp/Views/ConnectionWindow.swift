@@ -191,11 +191,13 @@ struct ConnectionWindow: View {
                 connectionName: connection.name
             )
             .pocketbase(pocketbase)
+            .id(connection.id) // Force recreation when connection changes
         } else {
             AdminLoginView {
                 isAuthenticated = true
             }
             .pocketbase(pocketbase)
+            .id(connection.id) // Force recreation when connection changes
         }
     }
 
@@ -255,6 +257,12 @@ struct ConnectionWindow: View {
             let pb = try await hub.connect(to: connection)
             self.pocketbase = pb
 
+            // Debug: Verify we're using the correct instance
+            print("🔌 Connected to: \(connection.name)")
+            print("   Connection ID: \(connection.id)")
+            print("   URL: \(pb.url)")
+            print("   Has token: \(pb.authStore.token != nil)")
+
             // Check if instance needs initial setup
             let needsInitialSetup = await checkNeedsSetup(pb)
             if needsInitialSetup {
@@ -302,7 +310,24 @@ struct ConnectionWindow: View {
     private func checkAuthentication() async {
         // Small delay to let authStore initialize
         try? await Task.sleep(for: .milliseconds(100))
-        isAuthenticated = pocketbase?.authStore.isValid ?? false
+
+        guard let pocketbase else {
+            isAuthenticated = false
+            isCheckingAuth = false
+            return
+        }
+
+        // Validate the token by attempting to refresh it
+        // If invalid, it will be automatically cleared
+        do {
+            let collection = pocketbase.collection(Superuser.self)
+            _ = try await collection.authRefresh()
+            isAuthenticated = true
+        } catch {
+            // Token is invalid, clear it
+            pocketbase.authStore.clear()
+            isAuthenticated = false
+        }
         isCheckingAuth = false
     }
 

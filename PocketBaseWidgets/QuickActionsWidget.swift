@@ -8,6 +8,7 @@
 import WidgetKit
 import SwiftUI
 import AppIntents
+import PocketBaseIntents
 
 // MARK: - Timeline Entry
 
@@ -50,10 +51,16 @@ struct CreateBackupWidgetIntent: AppIntent {
     static let title: LocalizedStringResource = "Create Backup"
     static let description = IntentDescription("Create a new PocketBase backup from the widget")
 
-    func perform() async throws -> some IntentResult & OpensIntent {
-        // This will open the app and trigger the backup
-        // TODO: Wire to CreateBackupIntent from PocketBaseIntents
-        return .result(opensIntent: OpenURLIntent())
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        do {
+            let _ = try await IntentHelpers.createBackup()
+            // Refresh backup widget after creating backup
+            WidgetCenter.shared.reloadTimelines(ofKind: "BackupStatusWidget")
+            return .result(dialog: "Backup created successfully")
+        } catch {
+            return .result(dialog: "Failed to create backup: \(error.localizedDescription)")
+        }
     }
 }
 

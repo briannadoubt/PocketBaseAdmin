@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Collection Model
 
@@ -15,12 +16,34 @@ struct WidgetCollection: Identifiable {
     let name: String
     let type: WidgetCollectionType
     let recordCount: Int
+
+    init(id: String, name: String, type: WidgetCollectionType, recordCount: Int) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.recordCount = recordCount
+    }
+
+    init(from simpleCollection: SimpleCollection) {
+        self.id = simpleCollection.id
+        self.name = simpleCollection.name
+        self.type = WidgetCollectionType(from: simpleCollection.type)
+        self.recordCount = simpleCollection.recordCount
+    }
 }
 
 enum WidgetCollectionType: String {
     case base
     case auth
     case view
+
+    init(from simpleType: SimpleCollectionType) {
+        switch simpleType {
+        case .base: self = .base
+        case .auth: self = .auth
+        case .view: self = .view
+        }
+    }
 
     var icon: String {
         switch self {
@@ -75,9 +98,11 @@ struct CollectionsListProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CollectionsListEntry>) -> Void) {
-        Task {
-            // TODO: Use PocketBaseIntents.GetCollectionsIntent when linked
-            let entry = CollectionsListEntry(date: Date(), collections: [])
+        Task { @MainActor in
+            let collections = await IntentHelpers.fetchCollections()
+            let widgetCollections = collections.map { WidgetCollection(from: $0) }
+
+            let entry = CollectionsListEntry(date: Date(), collections: widgetCollections)
 
             // Refresh every hour
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date())!

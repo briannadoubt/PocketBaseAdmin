@@ -352,6 +352,26 @@ final class PocketBaseServerManager {
         }
     }
 
+    /// Try to connect to an existing PocketBase instance on the port
+    private func canConnectToExistingInstance() async -> Bool {
+        let url = URL(string: "http://127.0.0.1:\(port)/api/health")!
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 2.0
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            if let httpResponse = response as? HTTPURLResponse {
+                // PocketBase health endpoint returns 200 OK if running
+                return httpResponse.statusCode == 200
+            }
+            return false
+        } catch {
+            return false
+        }
+    }
+
     /// Kill any existing process on our port
     private func killExistingProcess() {
         let killProcess = Process()
@@ -369,9 +389,21 @@ final class PocketBaseServerManager {
 
     /// Run the server process and stream output using Foundation's Process
     private func runServer() async {
-        // Check if port is already in use and kill existing process
+        // Check if port is already in use
         if isPortInUse() {
-            appendLog("Port \(port) is already in use, killing existing process...")
+            appendLog("Port \(port) is already in use, checking if we can connect to existing instance...")
+
+            // Try to connect to existing instance
+            if await canConnectToExistingInstance() {
+                appendLog("Successfully connected to existing PocketBase instance on port \(port)")
+                state = .running
+                appendLog("Server is running at http://127.0.0.1:\(port)")
+                appendLog("Admin UI: http://127.0.0.1:\(port)/_/")
+                return
+            }
+
+            // Can't connect, try to kill existing process
+            appendLog("Could not connect to existing instance, attempting to free port...")
             killExistingProcess()
 
             // Check again

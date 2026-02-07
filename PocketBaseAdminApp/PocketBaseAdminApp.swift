@@ -95,12 +95,11 @@ struct ConnectionCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("New Connection Window") {
-                openWindow(value: UUID?.none)
-            }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-
-            Divider()
+            // REMOVED: New Connection Window - no WindowGroup for per-connection windows
+            // Button("New Connection Window") {
+            //     openWindow(value: UUID?.none)
+            // }
+            // .keyboardShortcut("n", modifiers: [.command, .shift])
 
             Button("Show Connections") {
                 openWindow(id: "connections")
@@ -163,8 +162,10 @@ struct NewArchitectureRootView: View {
         Group {
             if let connectionID = selectedConnectionID {
                 ConnectionWindow(connectionID: connectionID, onSwitchConnection: switchConnectionAction)
+                    .id(connectionID) // Force recreation when connection changes
             } else if let firstConnection = hub.connections.first {
                 ConnectionWindow(connectionID: firstConnection.id, onSwitchConnection: switchConnectionAction)
+                    .id(firstConnection.id) // Force recreation when connection changes
                     .onAppear {
                         selectedConnectionID = firstConnection.id
                     }

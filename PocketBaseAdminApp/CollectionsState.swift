@@ -38,10 +38,12 @@ final class CollectionsState {
         isLoading = true
         error = nil
 
-        // Debug: Check auth state
-        logger.info("Loading collections - authStore.isValid: \(pocketbase.authStore.isValid), hasToken: \(pocketbase.authStore.token != nil)")
+        // Debug: Check which instance we're loading from
+        logger.info("📚 Loading collections from: \(pocketbase.url)")
+        logger.info("   authStore.isValid: \(pocketbase.authStore.isValid)")
+        logger.info("   hasToken: \(pocketbase.authStore.token != nil)")
         if let token = pocketbase.authStore.token {
-            logger.info("Token prefix: \(String(token.prefix(20)))...")
+            logger.info("   Token prefix: \(String(token.prefix(20)))...")
         }
 
         do {

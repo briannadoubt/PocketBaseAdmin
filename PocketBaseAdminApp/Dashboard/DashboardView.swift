@@ -27,6 +27,46 @@ struct DashboardView: View {
     }
 
     var body: some View {
+        // TEMPORARY: Simplified dashboard to debug crash
+        VStack(spacing: 20) {
+            Image(systemName: "chart.bar.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary)
+
+            Text("Dashboard")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            Text("Temporarily disabled while debugging")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if state.isLoading {
+                ProgressView("Loading data...")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Dashboard")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task {
+                        await state.loadAllData(pocketbase: pocketbase)
+                    }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .disabled(state.isLoading)
+            }
+        }
+        .task {
+            // Load persisted layout
+            state.layout = layout
+            // COMMENTED OUT: Dashboard data loading
+            // await state.loadAllData(pocketbase: pocketbase)
+        }
+
+        /* COMMENTED OUT: Full dashboard with widgets
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(state.layout.visibleWidgets) { widget in
@@ -100,6 +140,7 @@ struct DashboardView: View {
                 layout = state.layout
             }
         }
+        */
     }
 }
 

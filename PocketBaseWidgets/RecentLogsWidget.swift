@@ -7,6 +7,7 @@
 
 import WidgetKit
 import SwiftUI
+import PocketBaseIntents
 
 // MARK: - Log Entry Model
 
@@ -15,6 +16,20 @@ struct WidgetLogEntry: Identifiable {
     let level: WidgetLogLevel
     let message: String
     let timestamp: Date
+
+    init(id: String, level: WidgetLogLevel, message: String, timestamp: Date) {
+        self.id = id
+        self.level = level
+        self.message = message
+        self.timestamp = timestamp
+    }
+
+    init(from simpleLog: SimpleLogEntry) {
+        self.id = simpleLog.id
+        self.level = WidgetLogLevel(from: simpleLog.level)
+        self.message = simpleLog.message
+        self.timestamp = simpleLog.created
+    }
 }
 
 enum WidgetLogLevel: Int {
@@ -22,6 +37,15 @@ enum WidgetLogLevel: Int {
     case info = 0
     case warning = 4
     case error = 8
+
+    init(from simpleLevel: SimpleLogLevel) {
+        switch simpleLevel {
+        case .debug: self = .debug
+        case .info: self = .info
+        case .warning: self = .warning
+        case .error: self = .error
+        }
+    }
 
     var color: Color {
         switch self {
@@ -82,9 +106,11 @@ struct RecentLogsProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<RecentLogsEntry>) -> Void) {
-        Task {
-            // TODO: Use PocketBaseIntents.GetRecentLogsIntent when linked
-            let entry = RecentLogsEntry(date: Date(), logs: [])
+        Task { @MainActor in
+            let logs = await IntentHelpers.fetchRecentLogs(limit: 10)
+            let widgetLogs = logs.map { WidgetLogEntry(from: $0) }
+
+            let entry = RecentLogsEntry(date: Date(), logs: widgetLogs)
 
             // Refresh every 15 minutes
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!

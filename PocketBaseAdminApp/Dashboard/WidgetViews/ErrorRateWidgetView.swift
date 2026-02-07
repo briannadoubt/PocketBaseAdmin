@@ -76,7 +76,7 @@ struct ErrorRateWidgetView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(String(format: "%.1f%%", data.errorRate))
+                    unsafe Text(String(format: "%.1f%%", data.errorRate))
                         .font(.headline)
                         .foregroundStyle(errorColor)
                     Text("of requests")

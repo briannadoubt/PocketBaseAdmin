@@ -136,3 +136,46 @@ public struct GetErrorCountIntent: AppIntent {
         }
     }
 }
+
+/// Get warning count in the last 24 hours
+public struct GetWarningCountIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Get Warning Count"
+    public static let description = IntentDescription("Count warnings in the last 24 hours")
+
+    public static let openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
+        do {
+            let client = try await ServerConfiguration.shared.getClient()
+
+            // Get warnings from last 24 hours (level 4-7, not errors which are 8+)
+            let yesterday = Calendar.current.date(byAdding: .hour, value: -24, to: Date())!
+            let filter = "level >= 4 && level < 8 && created >= '\(yesterday.ISO8601Format())'"
+
+            let logs = try await client.admin.logs.list(
+                page: 1,
+                perPage: 1,
+                filter: filter
+            )
+
+            let warningCount = logs.totalItems
+
+            let dialog: IntentDialog
+            switch warningCount {
+            case 0:
+                dialog = "No warnings in the last 24 hours"
+            case 1:
+                dialog = "1 warning in the last 24 hours"
+            default:
+                dialog = "\(warningCount) warnings in the last 24 hours"
+            }
+
+            return .result(value: warningCount, dialog: dialog)
+        } catch {
+            throw ServerConfigurationError.serverError(error.localizedDescription)
+        }
+    }
+}
