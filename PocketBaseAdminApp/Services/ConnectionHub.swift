@@ -136,15 +136,29 @@ final class ConnectionHub {
 
         // Create connection-specific AuthStore to isolate auth between connections
         // Use the connection ID as part of the service name to ensure complete isolation
-        let authStore = AuthStore(
-            service: "io.pocketbase.auth.\(connection.id.uuidString)"
-        )
+        let service = "io.pocketbase.auth.\(connection.id.uuidString)"
+        let authStore = AuthStore(service: service)
+
+        // Restore saved token from KeychainStore if available
+        // This allows reconnecting without re-authentication
+        if let credential = try? keychainStore.loadToken(for: connection.id),
+           !credential.token.isEmpty {
+            authStore.set(token: credential.token)
+        }
 
         // Create new PocketBase instance with isolated auth store
         let pb = PocketBase(url: connection.url, authStore: authStore)
 
         // Store the active connection
         activeConnections[connection.id] = pb
+
+        #if DEBUG
+        print("🔌 Connected to: \(connection.name)")
+        print("   Connection ID: \(connection.id)")
+        print("   URL: \(pb.url)")
+        print("   AuthStore recordKey: record.\(service)")
+        print("   Has token: \(pb.authStore.token != nil)")
+        #endif
 
         // Update last connected timestamp
         var updatedConnection = connection
