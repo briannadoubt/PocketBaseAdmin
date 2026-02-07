@@ -20,7 +20,22 @@ struct AdminLoginView: View {
     @State private var errorMessage: String?
     @State private var needsInitialSetup = false
 
+    let connectionName: String?
+    let connectionURL: String?
     let onAuthenticated: () -> Void
+    let onSwitchConnection: (() -> Void)?
+
+    init(
+        connectionName: String? = nil,
+        connectionURL: String? = nil,
+        onSwitchConnection: (() -> Void)? = nil,
+        onAuthenticated: @escaping () -> Void
+    ) {
+        self.connectionName = connectionName
+        self.connectionURL = connectionURL
+        self.onSwitchConnection = onSwitchConnection
+        self.onAuthenticated = onAuthenticated
+    }
 
     private var backgroundColor: Color {
         #if os(macOS)
@@ -38,6 +53,49 @@ struct AdminLoginView: View {
 
             VStack(spacing: 32) {
                 Spacer()
+
+                // Connection info header
+                if let connectionName, let connectionURL {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "server.rack")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Signing into")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        VStack(spacing: 4) {
+                            Text(connectionName)
+                                .font(.headline)
+                                .fontWeight(.semibold)
+
+                            Text(connectionURL)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+
+                        if let onSwitchConnection {
+                            Button {
+                                onSwitchConnection()
+                            } label: {
+                                Label("Switch Connection", systemImage: "arrow.left.arrow.right")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                    }
+                }
 
                 // Logo and title
                 VStack(spacing: 16) {

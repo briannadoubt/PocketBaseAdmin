@@ -193,7 +193,11 @@ struct ConnectionWindow: View {
             .pocketbase(pocketbase)
             .id(connection.id) // Force recreation when connection changes
         } else {
-            AdminLoginView {
+            AdminLoginView(
+                connectionName: connection.name,
+                connectionURL: connection.displayURL,
+                onSwitchConnection: onSwitchConnection
+            ) {
                 isAuthenticated = true
             }
             .pocketbase(pocketbase)
@@ -317,14 +321,20 @@ struct ConnectionWindow: View {
             return
         }
 
-        // Validate the token by attempting to refresh it
-        // If invalid, it will be automatically cleared
+        // Check if we have a token before trying to refresh
+        guard pocketbase.authStore.isValid else {
+            isAuthenticated = false
+            isCheckingAuth = false
+            return
+        }
+
+        // Try to refresh the token to verify it's still valid
         do {
             let collection = pocketbase.collection(Superuser.self)
             _ = try await collection.authRefresh()
             isAuthenticated = true
         } catch {
-            // Token is invalid, clear it
+            // Token is invalid/expired - clear only THIS connection's auth
             pocketbase.authStore.clear()
             isAuthenticated = false
         }

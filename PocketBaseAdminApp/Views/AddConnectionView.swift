@@ -19,6 +19,7 @@ struct AddConnectionView: View {
     @State private var useTLS = false
     @State private var isLoading = false
     @State private var error: String?
+    @State private var testSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -33,12 +34,19 @@ struct AddConnectionView: View {
                         .autocorrectionDisabled()
                         .onChange(of: host) { _, newValue in
                             parseHostInput(newValue)
+                            clearTestResults()
                         }
                     TextField("Port", text: $port, prompt: Text("Optional (defaults to 443/80)"))
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
+                        .onChange(of: port) { _, _ in
+                            clearTestResults()
+                        }
                     Toggle("Use TLS (HTTPS)", isOn: $useTLS)
+                        .onChange(of: useTLS) { _, _ in
+                            clearTestResults()
+                        }
                 } header: {
                     Text("Connection Details")
                 } footer: {
@@ -56,11 +64,22 @@ struct AddConnectionView: View {
                     }
                 }
 
+                if testSuccess {
+                    Section {
+                        Label("Connection successful!", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
+
                 Section {
                     Button {
                         testConnection()
                     } label: {
                         HStack {
+                            if testSuccess {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
                             Text("Test Connection")
                             if isLoading {
                                 Spacer()
@@ -163,6 +182,7 @@ struct AddConnectionView: View {
 
         isLoading = true
         error = nil
+        testSuccess = false
 
         Task {
             do {
@@ -174,16 +194,24 @@ struct AddConnectionView: View {
 
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
+                        testSuccess = true
                         error = nil
                     } else {
+                        testSuccess = false
                         error = "Server returned status \(httpResponse.statusCode)"
                     }
                 }
             } catch {
+                testSuccess = false
                 self.error = error.localizedDescription
             }
             isLoading = false
         }
+    }
+
+    private func clearTestResults() {
+        error = nil
+        testSuccess = false
     }
 
     private func addConnection() {

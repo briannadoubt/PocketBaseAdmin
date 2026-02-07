@@ -11,11 +11,19 @@ import SwiftUI
 @available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 struct ConnectionPickerView: View {
     @Environment(ConnectionHub.self) private var hub
+    #if os(macOS)
     @Environment(\.openWindow) private var openWindow
+    #endif
     @Environment(\.dismiss) private var dismiss
+
+    @Binding var selectedConnectionID: UUID?
 
     @State private var isAddingConnection = false
     @State private var searchText = ""
+
+    init(selectedConnectionID: Binding<UUID?> = .constant(nil)) {
+        self._selectedConnectionID = selectedConnectionID
+    }
 
     var body: some View {
         NavigationStack {
@@ -24,6 +32,8 @@ struct ConnectionPickerView: View {
                 .navigationTitle("Connections")
                 #if os(macOS)
                 .navigationSubtitle("\(hub.connections.count) saved")
+                #elseif os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
                 #endif
                 .toolbar {
                     toolbarContent
@@ -55,7 +65,10 @@ struct ConnectionPickerView: View {
                 Button {
                     openConnection(connection)
                 } label: {
-                    ConnectionRow(connection: connection)
+                    ConnectionRow(
+                        connection: connection,
+                        isSelected: connection.id == selectedConnectionID
+                    )
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
@@ -88,6 +101,14 @@ struct ConnectionPickerView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        #if !os(macOS)
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Done") {
+                dismiss()
+            }
+        }
+        #endif
+
         ToolbarItem(placement: .primaryAction) {
             Button {
                 isAddingConnection = true
@@ -129,9 +150,10 @@ struct ConnectionPickerView: View {
     // MARK: - Actions
 
     private func openConnection(_ connection: Connection) {
-        // Connection switching is handled in the main window
-        // Just dismiss the picker and the main window will show the selected connection
+        selectedConnectionID = connection.id
+        #if !os(macOS)
         dismiss()
+        #endif
     }
 
     private func deleteConnections(at offsets: IndexSet) {
@@ -177,12 +199,13 @@ struct ConnectionPickerView: View {
 @available(macOS 15.0, iOS 18.0, visionOS 2.0, watchOS 11.0, tvOS 18.0, *)
 private struct ConnectionRow: View {
     let connection: Connection
+    let isSelected: Bool
     @Environment(ConnectionHub.self) private var hub
 
     var body: some View {
         HStack {
             Image(systemName: connection.statusIcon)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(isSelected ? Color.accentColor : statusColor)
                 .font(.title2)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -201,11 +224,18 @@ private struct ConnectionRow: View {
                     .foregroundStyle(.green)
             }
 
+            #if os(macOS)
             if let lastConnected = connection.lastConnected {
                 Text(lastConnected, style: .relative)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+            #else
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(Color.accentColor)
+            }
+            #endif
         }
         .padding(.vertical, 4)
     }
